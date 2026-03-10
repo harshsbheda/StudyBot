@@ -1,0 +1,5 @@
+cd /d E:\StudyBot\backend
+
+venv\Scripts\activate.bat
+
+python app.py

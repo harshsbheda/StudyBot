@@ -1,0 +1,267 @@
+/* ═══════════════════════════════════════════
+   StudyBot Admin Panel CSS
+═══════════════════════════════════════════ */
+
+.admin-layout {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── Admin Sidebar ── */
+.admin-sidebar {
+  width: 220px;
+  min-width: 220px;
+  background: var(--bg-2);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+.admin-sb-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.admin-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 10px;
+  flex: 1;
+}
+.admin-nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 500;
+  text-align: left;
+  width: 100%;
+  transition: all var(--transition);
+}
+.admin-nav-btn:hover { background: var(--bg-3); color: var(--text); }
+.admin-nav-btn.active { background: rgba(239,68,68,0.12); color: #ef4444; }
+.admin-sb-footer {
+  padding: 16px;
+  border-top: 1px solid var(--border);
+}
+
+/* ── Admin Main ── */
+.admin-main {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.admin-tab {
+  display: none;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+.admin-tab.active { display: flex; }
+
+.admin-topbar {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-2);
+  flex-shrink: 0;
+  gap: 16px;
+}
+
+/* ── Stats Grid ── */
+.admin-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+  padding: 24px;
+}
+.admin-stat {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 22px 20px;
+  position: relative;
+  overflow: hidden;
+}
+.admin-stat::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 4px; height: 100%;
+  background: #ef4444;
+  border-radius: 2px;
+}
+.admin-stat.green::before { background: var(--green); }
+.admin-stat.blue::before { background: var(--blue); }
+.admin-stat.amber::before { background: var(--amber); }
+.as-icon { font-size: 1.6rem; margin-bottom: 10px; }
+.as-value {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  line-height: 1;
+  margin-bottom: 4px;
+  color: var(--text);
+}
+.as-label { font-size: 0.78rem; color: var(--text-muted); }
+
+/* Recent activity */
+.admin-charts-row {
+  padding: 0 24px 24px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.admin-card {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+.admin-card h4 {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  margin-bottom: 14px;
+  color: var(--text);
+}
+
+/* ── Search ── */
+.admin-search {
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  outline: none;
+  width: 220px;
+  transition: border-color var(--transition);
+}
+.admin-search:focus { border-color: #ef4444; }
+.admin-search::placeholder { color: var(--text-faint); }
+
+/* ── Table ── */
+.admin-table-wrap {
+  flex: 1;
+  overflow: auto;
+  padding: 0 24px 24px;
+}
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.83rem;
+  min-width: 800px;
+}
+.admin-table th {
+  text-align: left;
+  padding: 12px 14px;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-faint);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-2);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  white-space: nowrap;
+}
+.admin-table td {
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border-soft);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.admin-table tr:hover td { background: var(--bg-3); }
+
+/* Badges */
+.badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.badge-admin    { background: rgba(239,68,68,0.12); color: #ef4444; }
+.badge-student  { background: rgba(88,166,255,0.12); color: var(--blue); }
+.badge-active   { background: rgba(63,185,80,0.12); color: var(--green); }
+.badge-suspended{ background: rgba(248,81,73,0.12); color: var(--red); }
+
+/* Action buttons */
+.tbl-btn {
+  background: var(--bg-4);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text-muted);
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+.tbl-btn:hover { border-color: var(--amber); color: var(--amber); }
+.tbl-btn.danger:hover { border-color: var(--red); color: var(--red); }
+.tbl-actions { display: flex; gap: 5px; }
+
+/* Score colors in table */
+.score-high { color: var(--green); font-weight: 600; }
+.score-mid  { color: var(--amber); font-weight: 600; }
+.score-low  { color: var(--red);   font-weight: 600; }
+
+.oauth-check-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.oauth-check {
+  border: 1px solid var(--border);
+  background: var(--bg-3);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.oauth-check.ok {
+  border-color: rgba(63,185,80,0.4);
+  color: var(--green);
+}
+
+.oauth-check.bad {
+  border-color: rgba(248,81,73,0.4);
+  color: var(--red);
+}
+
+.oauth-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 14px;
+}
+
+.oauth-grid code {
+  display: inline-block;
+  background: var(--bg-4);
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  padding: 3px 6px;
+  margin-bottom: 5px;
+  font-size: 0.76rem;
+}
+
+@media (max-width: 900px) {
+  .oauth-grid { grid-template-columns: 1fr; }
+}

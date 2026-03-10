@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StudyBot - Admin Panel</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="admin.css" />
+</head>
+<body>
+<div id="adminAuth" class="auth-screen">
+  <div class="auth-bg">
+    <div class="auth-orb orb1"></div>
+    <div class="auth-orb orb2" style="background:#ef4444"></div>
+  </div>
+  <div class="auth-card">
+    <div class="auth-brand">
+      <div class="brand-icon">A</div>
+      <h1 class="brand-name" style="color:#ef4444">Admin Panel</h1>
+      <p class="brand-tagline">StudyBot Administration</p>
+    </div>
+    <div id="adminLoginForm" class="auth-form active">
+      <h2 class="form-title">Admin Login</h2>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="adminEmail" placeholder="admin@studybot.com" />
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="adminPassword" placeholder="********" onkeydown="if(event.key==='Enter')adminLogin()" />
+      </div>
+      <div id="adminLoginError" class="auth-error hidden"></div>
+      <button class="btn-primary" style="background:#ef4444" onclick="adminLogin()">Sign In as Admin</button>
+    </div>
+  </div>
+</div>
+
+<div id="adminApp" class="admin-layout hidden">
+  <aside class="admin-sidebar">
+    <div class="admin-sb-header">
+      <span style="font-size:1.5rem">A</span>
+      <span class="sb-name" style="color:#ef4444">Admin</span>
+    </div>
+    <nav class="admin-nav">
+      <button class="admin-nav-btn active" onclick="adminTab('dashboard', this)">
+        <span>D</span> Dashboard
+      </button>
+      <button class="admin-nav-btn" onclick="adminTab('users', this)">
+        <span>U</span> Users
+      </button>
+      <button class="admin-nav-btn" onclick="adminTab('materials', this)">
+        <span>M</span> Materials
+      </button>
+      <button class="admin-nav-btn" onclick="adminTab('tests', this)">
+        <span>T</span> Tests
+      </button>
+      <button class="admin-nav-btn" onclick="adminTab('analytics', this)">
+        <span>S</span> Subject Analytics
+      </button>
+      <button class="admin-nav-btn" onclick="adminTab('oauth', this)">
+        <span>G</span> Google OAuth
+      </button>
+    </nav>
+    <div class="admin-sb-footer">
+      <div id="adminUserName" style="font-size:0.82rem;color:var(--text-muted);margin-bottom:8px;"></div>
+      <button class="btn-secondary" style="width:100%;font-size:0.82rem" onclick="adminLogout()">Logout</button>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+    <section id="admin-tab-dashboard" class="admin-tab active">
+      <div class="admin-topbar">
+        <h2 class="tab-title">Dashboard</h2>
+        <button class="btn-primary-sm" onclick="loadDashboard()">Refresh</button>
+      </div>
+      <div id="dashboardStats" class="admin-stats-grid"></div>
+    </section>
+
+    <section id="admin-tab-users" class="admin-tab">
+      <div class="admin-topbar">
+        <h2 class="tab-title">Users</h2>
+        <div style="display:flex;gap:10px;align-items:center">
+          <input type="text" id="userSearch" placeholder="Search users" class="admin-search" oninput="filterUsers(this.value)" />
+          <button class="btn-primary-sm" onclick="openCreateUserModal()">+ Add User</button>
+        </div>
+      </div>
+      <div class="admin-table-wrap">
+        <table class="admin-table" id="usersTable">
+          <thead>
+            <tr>
+              <th>ID</th><th>Name</th><th>Email</th><th>Role</th>
+              <th>Tests</th><th>Avg Score</th><th>Materials</th>
+              <th>Status</th><th>Joined</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="usersBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="admin-tab-materials" class="admin-tab">
+      <div class="admin-topbar">
+        <h2 class="tab-title">Study Materials</h2>
+        <input type="text" id="matSearch" placeholder="Search" class="admin-search" oninput="filterMaterials(this.value)" />
+      </div>
+      <div class="admin-table-wrap">
+        <table class="admin-table" id="materialsTable">
+          <thead>
+            <tr>
+              <th>ID</th><th>Title</th><th>Subject</th><th>User</th>
+              <th>Type</th><th>Size</th><th>Uploaded</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="materialsBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="admin-tab-tests" class="admin-tab">
+      <div class="admin-topbar">
+        <h2 class="tab-title">Test Attempts</h2>
+      </div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>ID</th><th>Test Title</th><th>Student</th><th>Type</th>
+              <th>Score</th><th>Correct</th><th>Time</th><th>Date</th>
+            </tr>
+          </thead>
+          <tbody id="testsBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="admin-tab-analytics" class="admin-tab">
+      <div class="admin-topbar">
+        <h2 class="tab-title">Subject Analytics</h2>
+        <button class="btn-primary-sm" onclick="loadSubjectAnalytics()">Refresh</button>
+      </div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>User</th><th>Subject</th><th>Materials</th><th>Attempts</th><th>Avg Score</th>
+            </tr>
+          </thead>
+          <tbody id="subjectAnalyticsBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="admin-tab-oauth" class="admin-tab">
+      <div class="admin-topbar">
+        <h2 class="tab-title">Google OAuth Setup</h2>
+        <button class="btn-primary-sm" onclick="loadGoogleOAuthCheck()">Run Check</button>
+      </div>
+      <div class="admin-table-wrap">
+        <div class="admin-card" id="googleOAuthCheckCard">
+          <p style="color:var(--text-muted)">Click "Run Check" to validate client ID, origins, and redirect URIs.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="editUserModal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Edit User</h3>
+      <button class="modal-close" onclick="closeModal('editUserModal')">X</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="editUserId" />
+      <div class="form-group">
+        <label>Role</label>
+        <select id="editUserRole" class="material-select">
+          <option value="student">Student</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <select id="editUserActive" class="material-select">
+          <option value="1">Active</option>
+          <option value="0">Suspended</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('editUserModal')">Cancel</button>
+      <button class="btn-primary" onclick="saveUser()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<div id="createUserModal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Add User</h3>
+      <button class="modal-close" onclick="closeModal('createUserModal')">X</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Name</label>
+        <input type="text" id="newUserName" placeholder="Full name" />
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="newUserEmail" placeholder="user@example.com" />
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="newUserPassword" placeholder="Minimum 6 characters" />
+      </div>
+      <div class="form-group">
+        <label>Role</label>
+        <select id="newUserRole" class="material-select">
+          <option value="student">Student</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <select id="newUserActive" class="material-select">
+          <option value="1">Active</option>
+          <option value="0">Suspended</option>
+        </select>
+      </div>
+      <div id="newUserError" class="auth-error hidden"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('createUserModal')">Cancel</button>
+      <button class="btn-primary" onclick="createUser()">Create User</button>
+    </div>
+  </div>
+</div>
+
+<div id="materialPreviewModal" class="modal-overlay hidden">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <h3 id="materialPreviewTitle">Material</h3>
+      <button class="modal-close" onclick="closeModal('materialPreviewModal')">X</button>
+    </div>
+    <div class="modal-body">
+      <p id="materialPreviewMeta" style="color:var(--text-muted);font-size:0.82rem;margin-bottom:10px"></p>
+      <div id="materialPreviewTopics" style="margin-bottom:12px"></div>
+      <textarea id="materialPreviewText" class="short-answer-input" style="min-height:320px" readonly></textarea>
+    </div>
+  </div>
+</div>
+
+<div id="userProfileModal" class="modal-overlay hidden">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <h3 id="userProfileTitle">User Profile</h3>
+      <button class="modal-close" onclick="closeModal('userProfileModal')">X</button>
+    </div>
+    <div class="modal-body" id="userProfileContent"></div>
+  </div>
+</div>
+
+<div id="loadingOverlay" class="loading-overlay hidden">
+  <div class="loading-box">
+    <div class="loader"></div>
+    <p id="loadingText">Loading...</p>
+  </div>
+</div>
+
+<script>window.STUDYBOT_API_BASE = 'http://localhost:5000/api';</script>
+<script src="js/admin.js"></script>
+</body>
+</html>

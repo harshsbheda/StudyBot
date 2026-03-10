@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StudyBot - AI Study Assistant</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div id="authScreen" class="auth-screen">
+  <div class="auth-bg">
+    <div class="auth-orb orb1"></div>
+    <div class="auth-orb orb2"></div>
+    <div class="auth-orb orb3"></div>
+  </div>
+  <div class="auth-card">
+    <div class="auth-brand">
+      <div class="brand-icon">SB</div>
+      <h1 class="brand-name">StudyBot</h1>
+      <p class="brand-tagline">Your AI-powered study companion</p>
+    </div>
+
+    <div id="loginForm" class="auth-form active">
+      <h2 class="form-title">Welcome back</h2>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="loginEmail" placeholder="you@email.com" />
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="loginPassword" placeholder="********" />
+      </div>
+      <div id="loginError" class="auth-error hidden"></div>
+      <button class="btn-primary" onclick="login()">Sign In</button>
+      <div class="divider"><span>or</span></div>
+      <button class="btn-google" onclick="googleLogin()">Continue with Google</button>
+      <p class="auth-switch">No account? <a href="#" onclick="showRegister()">Create one</a></p>
+    </div>
+
+    <div id="registerForm" class="auth-form">
+      <h2 class="form-title">Create account</h2>
+      <div class="form-group">
+        <label>Full Name</label>
+        <input type="text" id="regName" placeholder="Your name" />
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="regEmail" placeholder="you@email.com" />
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="regPassword" placeholder="Min 6 characters" />
+      </div>
+      <div id="registerError" class="auth-error hidden"></div>
+      <button class="btn-primary" onclick="register()">Create Account</button>
+      <div class="divider"><span>or</span></div>
+      <button class="btn-google" onclick="googleLogin()">Continue with Google</button>
+      <p class="auth-switch">Have account? <a href="#" onclick="showLogin()">Sign in</a></p>
+    </div>
+  </div>
+</div>
+
+<div id="appScreen" class="app-screen hidden">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sb-brand">
+        <span class="sb-icon">SB</span>
+        <span class="sb-name">StudyBot</span>
+      </div>
+      <button class="sb-toggle" onclick="toggleSidebar()">Menu</button>
+    </div>
+
+    <nav class="sb-nav">
+      <button class="nav-btn active" data-tab="chat" onclick="switchTab('chat', this)">
+        <span class="nav-label">Chat</span>
+      </button>
+      <button class="nav-btn" data-tab="materials" onclick="switchTab('materials', this)">
+        <span class="nav-label">Materials</span>
+      </button>
+      <button class="nav-btn" data-tab="tests" onclick="switchTab('tests', this)">
+        <span class="nav-label">Tests</span>
+      </button>
+      <button class="nav-btn" data-tab="progress" onclick="switchTab('progress', this)">
+        <span class="nav-label">Progress</span>
+      </button>
+    </nav>
+
+    <div class="sb-section">
+      <p class="sb-section-label">Active Subject</p>
+      <div style="display:flex;gap:8px;margin-bottom:8px;">
+        <button class="btn-new-chat" style="padding:6px 10px;" onclick="createSubjectPrompt()">+ Subject</button>
+        <button class="btn-new-chat" style="padding:6px 10px;" onclick="renameSubjectPrompt()">Rename</button>
+        <button class="btn-new-chat" style="padding:6px 10px;" onclick="deleteSubjectPrompt()">Delete</button>
+      </div>
+      <select id="materialSelect" class="material-select" onchange="selectSubject(this.value)">
+        <option value="">Select subject</option>
+      </select>
+    </div>
+
+    <div class="sb-section" id="chatHistorySection">
+      <p class="sb-section-label">Recent Chats</p>
+      <div id="chatHistoryList" class="history-list"></div>
+      <button class="btn-new-chat" onclick="newChat()">+ New Chat</button>
+    </div>
+
+    <div class="sb-user">
+      <div class="user-avatar-sb" id="userAvatarSb">S</div>
+      <div class="user-info-sb">
+        <span id="userNameSb">Student</span>
+        <span id="userEmailSb" class="user-email-sb">Loading...</span>
+      </div>
+      <button class="btn-logout" onclick="logout()" title="Logout">Logout</button>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <section id="tab-chat" class="tab-content active">
+      <div class="chat-topbar">
+        <div>
+          <h2 class="tab-title">Chat</h2>
+          <p class="tab-subtitle" id="chatSubtitle">Select a subject to start studying</p>
+        </div>
+        <div class="chat-actions">
+          <select id="aiProviderSelect" class="ai-select" onchange="onAiProviderChange()">
+            <option value="auto">Auto</option>
+            <option value="gemini">Gemini</option>
+            <option value="openai">OpenAI</option>
+          </select>
+          <select id="aiModelSelect" class="ai-select" onchange="saveAiSettings()">
+            <option value="">Select model</option>
+          </select>
+          <button class="btn-action-sm" onclick="loadImportantQuestions()">Key Questions</button>
+          <button class="btn-action-sm" onclick="loadKeyTopics()">Topics</button>
+        </div>
+      </div>
+
+      <div class="chat-messages" id="chatMessages">
+        <div class="welcome-card">
+          <h3>Hello! I am StudyBot</h3>
+          <p>Select a subject, upload files, and ask questions. I answer using your selected subject materials.</p>
+          <div class="wc-tips">
+            <span class="tip">Ask questions</span>
+            <span class="tip">Use Mic</span>
+            <span class="tip">Take tests</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="chat-input-area">
+        <div class="chat-input-wrap">
+          <input type="text" id="chatInput" class="chat-input" placeholder="Ask anything about your selected subject..." onkeydown="if(event.key==='Enter')sendMessage()" />
+          <button class="btn-voice" id="btnMic" onclick="toggleMic()" title="Speak message">🎙️</button>
+          <button class="btn-voice" id="btnMute" onclick="toggleMute()" title="Mute voice output">Mute</button>
+          <button class="btn-send" onclick="sendMessage()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-materials" class="tab-content">
+      <div class="tab-topbar">
+        <div>
+          <h2 class="tab-title">Study Materials</h2>
+          <p class="tab-subtitle">Upload your notes, textbooks, and PDFs</p>
+        </div>
+        <button class="btn-primary-sm" onclick="showUploadModal()">+ Upload</button>
+      </div>
+      <div id="materialsList" class="materials-grid"></div>
+    </section>
+
+    <section id="tab-tests" class="tab-content">
+      <div class="tab-topbar">
+        <div>
+          <h2 class="tab-title">Tests & Quizzes</h2>
+          <p class="tab-subtitle">Test your knowledge from your materials</p>
+        </div>
+        <button class="btn-primary-sm" onclick="showTestModal()">+ Generate Test</button>
+      </div>
+      <div id="testArea">
+        <div id="testHistory" class="test-history"></div>
+      </div>
+    </section>
+
+    <section id="tab-progress" class="tab-content">
+      <div class="tab-topbar">
+        <h2 class="tab-title">My Progress</h2>
+      </div>
+      <div id="progressContent" class="progress-grid"></div>
+    </section>
+  </main>
+</div>
+
+<div id="uploadModal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Upload Study Material</h3>
+      <button class="modal-close" onclick="closeModal('uploadModal')">X</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Title</label>
+        <input type="text" id="uploadTitle" placeholder="e.g. Chapter 3 - Photosynthesis" />
+      </div>
+      <div class="form-group">
+        <label>Subject</label>
+        <select id="uploadSubjectSelect" class="material-select"></select>
+        <input type="text" id="uploadSubject" placeholder="Or type new subject name" />
+      </div>
+      <div class="form-group">
+        <label>File</label>
+        <div class="file-drop" id="fileDrop" onclick="document.getElementById('fileInput').click()" ondragover="dragOver(event)" ondrop="dropFile(event)">
+          <div class="file-drop-icon">Upload</div>
+          <p>Click to browse or drag and drop</p>
+          <small>PDF, DOCX, TXT, PNG, JPG - Max 50MB</small>
+        </div>
+        <input type="file" id="fileInput" multiple accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg,.webp" style="display:none" onchange="fileSelected(this)" />
+        <div id="fileSelectedName" class="file-selected hidden"></div>
+      </div>
+      <div id="uploadError" class="auth-error hidden"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('uploadModal')">Cancel</button>
+      <button class="btn-primary" onclick="uploadMaterial()">Upload & Process</button>
+    </div>
+  </div>
+</div>
+
+<div id="testModal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Generate Test</h3>
+      <button class="modal-close" onclick="closeModal('testModal')">X</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Subject</label>
+        <select id="testMaterialSelect" class="material-select"></select>
+      </div>
+      <div class="form-group">
+        <label>Test Type</label>
+        <div class="radio-group">
+          <label class="radio-option"><input type="radio" name="testType" value="mcq" checked /> MCQ (Multiple Choice)</label>
+          <label class="radio-option"><input type="radio" name="testType" value="short_answer" /> Short Answer</label>
+          <label class="radio-option"><input type="radio" name="testType" value="mixed" /> Mixed</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Number of Questions: <span id="qCountLabel">10</span></label>
+        <input type="range" min="5" max="20" value="10" id="qCount" oninput="document.getElementById('qCountLabel').textContent=this.value" />
+      </div>
+      <div class="form-group">
+        <label>Difficulty</label>
+        <div class="radio-group">
+          <label class="radio-option"><input type="radio" name="difficulty" value="easy" /> Easy</label>
+          <label class="radio-option"><input type="radio" name="difficulty" value="medium" checked /> Medium</label>
+          <label class="radio-option"><input type="radio" name="difficulty" value="hard" /> Hard</label>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('testModal')">Cancel</button>
+      <button class="btn-primary" onclick="generateTest()">Generate Test</button>
+    </div>
+  </div>
+</div>
+
+<div id="topicsModal" class="modal-overlay hidden">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <h3>Key Topics & Questions</h3>
+      <button class="modal-close" onclick="closeModal('topicsModal')">X</button>
+    </div>
+    <div class="modal-body" id="topicsContent"></div>
+  </div>
+</div>
+
+<div id="testView" class="modal-overlay hidden">
+  <div class="modal modal-wide test-modal">
+    <div class="modal-header">
+      <h3 id="testViewTitle">Test</h3>
+      <div class="test-timer" id="testTimer">00:00</div>
+    </div>
+    <div class="modal-body" id="testViewBody"></div>
+    <div class="modal-footer">
+      <button class="btn-primary" onclick="submitTest()">Submit Test</button>
+    </div>
+  </div>
+</div>
+
+<div id="resultsModal" class="modal-overlay hidden">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <h3>Test Results</h3>
+      <button class="modal-close" onclick="closeModal('resultsModal')">X</button>
+    </div>
+    <div class="modal-body" id="resultsContent"></div>
+    <div class="modal-footer">
+      <button class="btn-primary" onclick="closeModal('resultsModal')">Done</button>
+    </div>
+  </div>
+</div>
+
+<div id="loadingOverlay" class="loading-overlay hidden">
+  <div class="loading-box">
+    <div class="loader"></div>
+    <p id="loadingText">Processing...</p>
+  </div>
+</div>
+
+<script>window.STUDYBOT_API_BASE = 'http://localhost:5000/api';</script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="js/app.js"></script>
+</body>
+</html>
