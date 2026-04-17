@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>StudyBot - Admin Panel</title>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="admin.css" />
 </head>
@@ -12,12 +12,12 @@
 <div id="adminAuth" class="auth-screen">
   <div class="auth-bg">
     <div class="auth-orb orb1"></div>
-    <div class="auth-orb orb2" style="background:#ef4444"></div>
+    <div class="auth-orb orb2"></div>
   </div>
   <div class="auth-card">
     <div class="auth-brand">
       <div class="brand-icon">A</div>
-      <h1 class="brand-name" style="color:#ef4444">Admin Panel</h1>
+      <h1 class="brand-name">Admin Panel</h1>
       <p class="brand-tagline">StudyBot Administration</p>
     </div>
     <div id="adminLoginForm" class="auth-form active">
@@ -31,7 +31,8 @@
         <input type="password" id="adminPassword" placeholder="********" onkeydown="if(event.key==='Enter')adminLogin()" />
       </div>
       <div id="adminLoginError" class="auth-error hidden"></div>
-      <button class="btn-primary" style="background:#ef4444" onclick="adminLogin()">Sign In as Admin</button>
+      <button class="btn-primary" onclick="adminLogin()">Sign In as Admin</button>
+      <p class="auth-switch"><a href="#" onclick="openResetModal()">Forgot password?</a></p>
     </div>
   </div>
 </div>
@@ -39,27 +40,36 @@
 <div id="adminApp" class="admin-layout hidden">
   <aside class="admin-sidebar">
     <div class="admin-sb-header">
-      <span style="font-size:1.5rem">A</span>
-      <span class="sb-name" style="color:#ef4444">Admin</span>
+      <span class="admin-brand-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" class="ui-icon">
+          <path d="M12 3 18 9 12 15 6 9 12 3Z"/>
+          <circle cx="12" cy="9" r="1.5"/>
+          <path d="M12 15v4"/>
+        </svg>
+      </span>
+      <span class="sb-name">Admin</span>
     </div>
     <nav class="admin-nav">
       <button class="admin-nav-btn active" onclick="adminTab('dashboard', this)">
-        <span>D</span> Dashboard
+        <span class="admin-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" class="ui-icon"><rect x="4" y="4" width="6" height="6" rx="1.3"/><rect x="14" y="4" width="6" height="6" rx="1.3"/><rect x="4" y="14" width="6" height="6" rx="1.3"/><rect x="14" y="14" width="6" height="6" rx="1.3"/></svg></span><span class="admin-nav-label">Dashboard</span>
       </button>
       <button class="admin-nav-btn" onclick="adminTab('users', this)">
-        <span>U</span> Users
+        <span class="admin-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" class="ui-icon"><circle cx="9" cy="9" r="2.5"/><circle cx="15.5" cy="10" r="2"/><path d="M5.5 18a3.5 3.5 0 0 1 7 0"/><path d="M13 18a2.8 2.8 0 0 1 5.5 0"/></svg></span><span class="admin-nav-label">Users</span>
       </button>
       <button class="admin-nav-btn" onclick="adminTab('materials', this)">
-        <span>M</span> Materials
+        <span class="admin-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" class="ui-icon"><path d="M9.5 4.5h5.5l3 3V19a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 8 19V6A1.5 1.5 0 0 1 9.5 4.5Z"/><path d="M15 4.5V8h3"/><path d="M10 12h6"/><path d="M10 15h5"/></svg></span><span class="admin-nav-label">Materials</span>
       </button>
       <button class="admin-nav-btn" onclick="adminTab('tests', this)">
-        <span>T</span> Tests
+        <span class="admin-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" class="ui-icon"><path d="M9 4h6"/><path d="M9.5 6h5A1.5 1.5 0 0 1 16 7.5V19a1.5 1.5 0 0 1-1.5 1.5h-5A1.5 1.5 0 0 1 8 19V7.5A1.5 1.5 0 0 1 9.5 6Z"/><path d="m10.5 13 1.5 1.5 3-3"/></svg></span><span class="admin-nav-label">Tests</span>
       </button>
       <button class="admin-nav-btn" onclick="adminTab('analytics', this)">
-        <span>S</span> Subject Analytics
+        <span class="admin-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" class="ui-icon"><path d="M5 19.5h14"/><path d="M8 16V10"/><path d="M12 16V7"/><path d="M16 16v-4"/><path d="m7 9 4-3 5 4 2-2"/></svg></span><span class="admin-nav-label">Subject Analytics</span>
+      </button>
+      <button class="admin-nav-btn" onclick="adminTab('reports', this)">
+        <span class="admin-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" class="ui-icon"><path d="M8.5 4.5h7l3 3V19a1.5 1.5 0 0 1-1.5 1.5h-8A1.5 1.5 0 0 1 7.5 19V6A1.5 1.5 0 0 1 8.5 4.5Z"/><path d="M15.5 4.5V8h3"/><path d="M10 12h6"/><path d="M10 15h6"/><path d="M10 18h4"/></svg></span><span class="admin-nav-label">Reports</span>
       </button>
       <button class="admin-nav-btn" onclick="adminTab('oauth', this)">
-        <span>G</span> Google OAuth
+        <span class="admin-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" class="ui-icon"><path d="M12 3.5 18 6v5c0 4.2-2.7 7.5-6 9-3.3-1.5-6-4.8-6-9V6l6-2.5Z"/><path d="m9.8 12.3 1.6 1.6 3.2-3.2"/></svg></span><span class="admin-nav-label">Google OAuth</span>
       </button>
     </nav>
     <div class="admin-sb-footer">
@@ -148,6 +158,56 @@
           </thead>
           <tbody id="subjectAnalyticsBody"></tbody>
         </table>
+      </div>
+    </section>
+
+    <section id="admin-tab-reports" class="admin-tab">
+      <div class="admin-topbar">
+        <h2 class="tab-title">Reports & Export</h2>
+        <div class="admin-actions">
+          <div class="admin-date-range">
+            <input type="date" id="reportStart" />
+            <span>to</span>
+            <input type="date" id="reportEnd" />
+            <button class="btn-secondary" onclick="applyReportFilter()">Apply</button>
+            <button class="btn-secondary" onclick="clearReportFilter()">Clear</button>
+          </div>
+          <input type="text" id="exportUserIds" class="admin-search" placeholder="User IDs (comma-separated)" />
+          <button class="btn-primary-sm" onclick="loadReports()">Refresh</button>
+          <button class="btn-secondary" onclick="exportData('users')">Export Users</button>
+          <button class="btn-secondary" onclick="exportData('materials')">Export Materials</button>
+          <button class="btn-secondary" onclick="exportData('tests')">Export Tests</button>
+          <button class="btn-secondary" onclick="exportData('subjects')">Export Subjects</button>
+          <button class="btn-secondary" onclick="exportData('insights')">Export Insights</button>
+        </div>
+      </div>
+      <div class="admin-stats-grid" id="reportsOverview"></div>
+      <div class="admin-charts-row">
+        <div class="admin-card">
+          <h4>Top Subjects</h4>
+          <div class="admin-table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr><th>Subject</th><th>Materials</th><th>Users</th></tr>
+              </thead>
+              <tbody id="reportsTopSubjects"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="admin-card">
+          <h4>Activity (Last 14 Days)</h4>
+          <div id="reportsActivity"></div>
+        </div>
+      </div>
+      <div class="admin-charts-row">
+        <div class="admin-card">
+          <h4>User Insights</h4>
+          <div id="reportsInsights"></div>
+        </div>
+        <div class="admin-card">
+          <h4>Inactive Users</h4>
+          <div id="reportsInactive"></div>
+        </div>
       </div>
     </section>
 
@@ -268,7 +328,36 @@
   </div>
 </div>
 
-<script>window.STUDYBOT_API_BASE = 'http://localhost:5000/api';</script>
+<div id="resetModal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Reset Password</h3>
+      <button class="modal-close" onclick="closeModal('resetModal')">X</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="resetEmail" placeholder="admin@studybot.com" />
+      </div>
+      <div class="form-group">
+        <label>Reset Code</label>
+        <input type="text" id="resetToken" placeholder="Code from email" />
+        <small id="resetTokenHint" style="color:var(--text-faint)"></small>
+      </div>
+      <div class="form-group">
+        <label>New Password</label>
+        <input type="password" id="resetPassword" placeholder="Min 6 characters" />
+      </div>
+      <div id="resetError" class="auth-error hidden"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="requestResetCode()">Get Code</button>
+      <button class="btn-primary" onclick="resetPassword()">Reset Password</button>
+    </div>
+  </div>
+</div>
+
+<script>window.STUDYBOT_API_BASE = window.STUDYBOT_API_BASE || '/api';</script>
 <script src="js/admin.js"></script>
 </body>
 </html>

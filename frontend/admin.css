@@ -6,17 +6,70 @@
   display: flex;
   height: 100vh;
   overflow: hidden;
+  position: relative;
+}
+
+@keyframes adminAuroraShift {
+  from { transform: translate3d(-2%, -1%, 0) scale(1); }
+  to { transform: translate3d(2%, 2%, 0) scale(1.06); }
+}
+
+@keyframes adminHoloSweep {
+  from { transform: translateX(-135%) skewX(-18deg); }
+  to { transform: translateX(135%) skewX(-18deg); }
+}
+
+@keyframes adminParticleDrift {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-28px, -16px, 0); }
+}
+
+@keyframes adminTrailShift {
+  from { transform: translate3d(-3%, -2%, 0); }
+  to { transform: translate3d(3%, 2%, 0); }
+}
+
+.admin-layout::before,
+.admin-layout::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.admin-layout::before {
+  background:
+    radial-gradient(circle at 14% 24%, rgba(87, 242, 255, 0.58) 0 1px, transparent 2px),
+    radial-gradient(circle at 28% 70%, rgba(122, 141, 255, 0.44) 0 1px, transparent 2px),
+    radial-gradient(circle at 54% 18%, rgba(87, 242, 255, 0.42) 0 1px, transparent 2px),
+    radial-gradient(circle at 72% 74%, rgba(156, 255, 120, 0.28) 0 1px, transparent 2px),
+    radial-gradient(circle at 88% 28%, rgba(87, 242, 255, 0.56) 0 1px, transparent 2px);
+  opacity: 0.28;
+  animation: adminParticleDrift 24s linear infinite;
+}
+
+.admin-layout::after {
+  inset: -10%;
+  background:
+    linear-gradient(125deg, transparent 0 48%, rgba(87, 242, 255, 0.04) 49%, transparent 50%) 0 0 / 260px 260px,
+    linear-gradient(125deg, transparent 0 49%, rgba(255, 255, 255, 0.03) 50%, transparent 51%) 0 0 / 340px 340px;
+  opacity: 0.2;
+  animation: adminTrailShift 16s linear infinite alternate;
 }
 
 /* ── Admin Sidebar ── */
 .admin-sidebar {
   width: 220px;
   min-width: 220px;
-  background: var(--bg-2);
-  border-right: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(7, 17, 36, 0.94), rgba(5, 11, 24, 0.94));
+  border-right: 1px solid rgba(87, 242, 255, 0.14);
   display: flex;
   flex-direction: column;
   padding: 0;
+  backdrop-filter: blur(18px);
+  position: relative;
+  z-index: 1;
 }
 .admin-sb-header {
   display: flex;
@@ -24,6 +77,21 @@
   gap: 10px;
   padding: 20px 18px;
   border-bottom: 1px solid var(--border);
+}
+.admin-brand-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  color: var(--amber);
+  border: 1px solid rgba(87, 242, 255, 0.22);
+  background: linear-gradient(180deg, rgba(87, 242, 255, 0.16), rgba(20, 184, 255, 0.05));
+  box-shadow: inset 0 0 0 1px rgba(87, 242, 255, 0.08), 0 0 20px rgba(20, 184, 255, 0.12);
 }
 .admin-nav {
   display: flex;
@@ -47,9 +115,67 @@
   text-align: left;
   width: 100%;
   transition: all var(--transition);
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
 }
-.admin-nav-btn:hover { background: var(--bg-3); color: var(--text); }
-.admin-nav-btn.active { background: rgba(239,68,68,0.12); color: #ef4444; }
+.admin-nav-btn:hover {
+  background: linear-gradient(90deg, rgba(15, 36, 71, 0.82), rgba(12, 31, 61, 0.34));
+  color: var(--text);
+  transform: translateX(3px);
+}
+.admin-nav-btn.active {
+  background: linear-gradient(90deg, rgba(87, 242, 255, 0.12), rgba(20, 184, 255, 0.06));
+  color: var(--amber);
+  border: 1px solid rgba(87, 242, 255, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(87, 242, 255, 0.08), 0 0 20px rgba(20, 184, 255, 0.08);
+}
+.admin-nav-btn::before {
+  content: '';
+  position: absolute;
+  inset: -30% auto -30% -40%;
+  width: 60%;
+  background: linear-gradient(120deg, transparent 0%, rgba(255, 255, 255, 0.2) 48%, transparent 100%);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-150%) skewX(-18deg);
+}
+.admin-nav-btn:hover::before,
+.admin-nav-btn.active::before {
+  opacity: 1;
+  animation: adminHoloSweep 0.8s ease;
+}
+.admin-nav-icon {
+  min-width: 44px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 0.56rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--amber);
+  border: 1px solid rgba(87, 242, 255, 0.18);
+  background: linear-gradient(180deg, rgba(87, 242, 255, 0.12), rgba(20, 184, 255, 0.05));
+  box-shadow: inset 0 0 0 1px rgba(87, 242, 255, 0.06), 0 0 18px rgba(20, 184, 255, 0.08);
+}
+.admin-nav-label {
+  letter-spacing: 0.04em;
+  transition: transform var(--transition), color var(--transition);
+}
+.admin-nav-btn:hover .admin-nav-label,
+.admin-nav-btn.active .admin-nav-label {
+  transform: translateX(1px);
+}
+.admin-nav-btn.active .admin-nav-icon {
+  color: #031019;
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--amber), var(--amber-dark));
+  box-shadow: 0 0 22px rgba(20, 184, 255, 0.24);
+}
 .admin-sb-footer {
   padding: 16px;
   border-top: 1px solid var(--border);
@@ -61,6 +187,37 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  position: relative;
+  z-index: 1;
+}
+.admin-main::before,
+.admin-main::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+.admin-main::before {
+  inset: -12%;
+  background:
+    radial-gradient(circle at 10% 14%, rgba(87, 242, 255, 0.12), transparent 22%),
+    radial-gradient(circle at 86% 12%, rgba(122, 141, 255, 0.12), transparent 24%),
+    radial-gradient(circle at 55% 80%, rgba(156, 255, 120, 0.07), transparent 24%);
+  filter: blur(20px);
+  animation: adminAuroraShift 18s ease-in-out infinite alternate;
+}
+.admin-main::after {
+  background:
+    linear-gradient(rgba(87, 242, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(87, 242, 255, 0.04) 1px, transparent 1px);
+  background-size: 52px 52px;
+  mask-image: radial-gradient(circle at center, black 56%, transparent 92%);
+  opacity: 0.28;
+}
+.admin-main > * {
+  position: relative;
+  z-index: 1;
 }
 .admin-tab {
   display: none;
@@ -72,14 +229,45 @@
 
 .admin-topbar {
   padding: 18px 24px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid rgba(87, 242, 255, 0.12);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: var(--bg-2);
+  background: linear-gradient(180deg, rgba(8, 19, 39, 0.84) 0%, rgba(7, 15, 32, 0.7) 100%);
   flex-shrink: 0;
   gap: 16px;
+  backdrop-filter: blur(14px);
+  position: relative;
 }
+.admin-topbar::after {
+  content: '';
+  position: absolute;
+  left: 24px;
+  bottom: -1px;
+  width: 132px;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(87, 242, 255, 0.9), rgba(20, 184, 255, 0.14), transparent);
+}
+.admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.admin-date-range {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.admin-date-range input {
+  background: rgba(12, 28, 54, 0.88);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  padding: 6px 10px;
+  font-size: 0.82rem;
+}
+.admin-date-range span { color: var(--text-faint); font-size: 0.82rem; }
 
 /* ── Stats Grid ── */
 .admin-stats-grid {
@@ -89,20 +277,47 @@
   padding: 24px;
 }
 .admin-stat {
-  background: var(--bg-2);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 18%),
+    repeating-linear-gradient(180deg, transparent 0 7px, rgba(87, 242, 255, 0.04) 7px 8px),
+    var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 22px 20px;
   position: relative;
   overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(18px);
+  transition: transform var(--transition), border-color var(--transition), box-shadow var(--transition);
+  animation: dashboardScan 4.1s linear infinite;
+}
+.admin-stat:hover {
+  transform: translateY(-4px);
+  border-color: rgba(87, 242, 255, 0.24);
+  box-shadow: var(--shadow-sm), 0 0 34px rgba(20, 184, 255, 0.12);
 }
 .admin-stat::before {
   content: '';
   position: absolute;
   top: 0; left: 0;
   width: 4px; height: 100%;
-  background: #ef4444;
+  background: var(--amber);
   border-radius: 2px;
+}
+.admin-stat::after,
+.admin-card::after {
+  content: '';
+  position: absolute;
+  inset: -20%;
+  background: linear-gradient(112deg, transparent 30%, rgba(148, 255, 247, 0.16) 48%, rgba(122, 141, 255, 0.12) 56%, transparent 72%);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-130%) skewX(-18deg);
+}
+.admin-stat:hover::after,
+.admin-card:hover::after {
+  opacity: 1;
+  animation: adminHoloSweep 1s ease;
 }
 .admin-stat.green::before { background: var(--green); }
 .admin-stat.blue::before { background: var(--blue); }
@@ -125,10 +340,21 @@
   gap: 16px;
 }
 .admin-card {
-  background: var(--bg-2);
+  background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 20px;
+  backdrop-filter: blur(18px);
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  transition: transform var(--transition), border-color var(--transition), box-shadow var(--transition);
+}
+.admin-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(87, 242, 255, 0.24);
+  box-shadow: var(--shadow-sm), 0 0 32px rgba(20, 184, 255, 0.1);
 }
 .admin-card h4 {
   font-family: var(--font-display);
@@ -139,7 +365,7 @@
 
 /* ── Search ── */
 .admin-search {
-  background: var(--bg-3);
+  background: rgba(12, 28, 54, 0.88);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text);
@@ -149,7 +375,7 @@
   width: 220px;
   transition: border-color var(--transition);
 }
-.admin-search:focus { border-color: #ef4444; }
+.admin-search:focus { border-color: var(--amber); }
 .admin-search::placeholder { color: var(--text-faint); }
 
 /* ── Table ── */
@@ -164,6 +390,8 @@
   font-size: 0.83rem;
   min-width: 800px;
 }
+.admin-table.compact { min-width: 0; font-size: 0.78rem; }
+.admin-table.compact th, .admin-table.compact td { padding: 8px 10px; }
 .admin-table th {
   text-align: left;
   padding: 12px 14px;
@@ -172,7 +400,7 @@
   letter-spacing: 0.07em;
   color: var(--text-faint);
   border-bottom: 1px solid var(--border);
-  background: var(--bg-2);
+  background: rgba(8, 19, 39, 0.94);
   position: sticky;
   top: 0;
   z-index: 1;
@@ -194,14 +422,14 @@
   font-size: 0.72rem;
   font-weight: 600;
 }
-.badge-admin    { background: rgba(239,68,68,0.12); color: #ef4444; }
-.badge-student  { background: rgba(88,166,255,0.12); color: var(--blue); }
+.badge-admin    { background: rgba(255,111,145,0.14); color: var(--red); }
+.badge-student  { background: rgba(87,242,255,0.12); color: var(--amber); }
 .badge-active   { background: rgba(63,185,80,0.12); color: var(--green); }
 .badge-suspended{ background: rgba(248,81,73,0.12); color: var(--red); }
 
 /* Action buttons */
 .tbl-btn {
-  background: var(--bg-4);
+  background: rgba(12, 28, 54, 0.88);
   border: 1px solid var(--border);
   border-radius: 5px;
   color: var(--text-muted);
@@ -210,8 +438,29 @@
   cursor: pointer;
   transition: all var(--transition);
   white-space: nowrap;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
 }
-.tbl-btn:hover { border-color: var(--amber); color: var(--amber); }
+.tbl-btn::before {
+  content: '';
+  position: absolute;
+  inset: -30% auto -30% -40%;
+  width: 60%;
+  background: linear-gradient(120deg, transparent 0%, rgba(255, 255, 255, 0.2) 48%, transparent 100%);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-150%) skewX(-18deg);
+}
+.tbl-btn:hover {
+  border-color: var(--amber);
+  color: var(--amber);
+  transform: translateY(-1px);
+}
+.tbl-btn:hover::before {
+  opacity: 1;
+  animation: adminHoloSweep 0.8s ease;
+}
 .tbl-btn.danger:hover { border-color: var(--red); color: var(--red); }
 .tbl-actions { display: flex; gap: 5px; }
 
@@ -228,7 +477,7 @@
 
 .oauth-check {
   border: 1px solid var(--border);
-  background: var(--bg-3);
+  background: rgba(12, 28, 54, 0.88);
   border-radius: var(--radius-sm);
   padding: 8px 10px;
   font-size: 0.82rem;
@@ -254,13 +503,32 @@
 
 .oauth-grid code {
   display: inline-block;
-  background: var(--bg-4);
+  background: rgba(12, 28, 54, 0.88);
   border: 1px solid var(--border-soft);
   border-radius: 6px;
   padding: 3px 6px;
   margin-bottom: 5px;
   font-size: 0.76rem;
 }
+
+.report-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+.report-list h5 {
+  font-size: 0.85rem;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+.report-split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+.muted { color: var(--text-faint); }
 
 @media (max-width: 900px) {
   .oauth-grid { grid-template-columns: 1fr; }

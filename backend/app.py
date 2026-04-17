@@ -2,6 +2,7 @@ import os
 import sys
 from datetime import timedelta
 
+import bcrypt
 from flask import Flask, jsonify, send_from_directory
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
@@ -11,6 +12,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import config
 from services.ai_service import get_ai_settings
+from database.db import get_db, get_next_id, ensure_user_progress, utcnow
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
@@ -25,7 +27,9 @@ app.config["JWT_HEADER_TYPE"] = "Bearer"
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(days=config.JWT_EXPIRY_DAYS)
 app.config["MAX_CONTENT_LENGTH"] = config.MAX_UPLOAD_MB * 1024 * 1024
 
-CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
+cors_origins = config.CORS_ALLOWED_ORIGINS or config.GOOGLE_ALLOWED_ORIGINS
+if cors_origins:
+    CORS(app, resources={r"/api/*": {"origins": cors_origins}})
 
 jwt = JWTManager(app)
 
@@ -46,6 +50,76 @@ def missing_token_callback(error):
 
 
 os.makedirs(config.UPLOAD_FOLDER, exist_ok=True)
+
+
+def _validate_runtime_config() -> None:
+    if config.DEBUG:
+        return
+
+    insecure_secret_values = {
+        "",
+        "change-this-secret-key",
+        "change-this-jwt-secret",
+        "change-me-to-a-long-random-secret",
+        "change-me-to-a-different-long-random-secret",
+        "studybot-xyz-2024-abc",
+        "studybot-super-secret-jwt-key-2024-xyz987",
+    }
+
+    missing = []
+    if config.SECRET_KEY.strip() in insecure_secret_values:
+        missing.append("SECRET_KEY")
+    if config.JWT_SECRET.strip() in insecure_secret_values:
+        missing.append("JWT_SECRET")
+
+    if missing:
+        raise RuntimeError(
+            "Set secure values for {} before running with DEBUG=false.".format(", ".join(missing))
+        )
+
+
+def _ensure_bootstrap_admin() -> None:
+    email = config.BOOTSTRAP_ADMIN_EMAIL
+    password = config.BOOTSTRAP_ADMIN_PASSWORD
+
+    if not email and not password:
+        return
+
+    if not email or not password:
+        raise RuntimeError(
+            "Set both BOOTSTRAP_ADMIN_EMAIL and BOOTSTRAP_ADMIN_PASSWORD, or leave both empty."
+        )
+
+    if len(password) < 8:
+        raise RuntimeError("BOOTSTRAP_ADMIN_PASSWORD must be at least 8 characters.")
+
+    db = get_db()
+    users = db.collection("users").where("email", "==", email).limit(1).get()
+    if users:
+        return
+
+    admin_id = get_next_id("users")
+    password_hash = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    db.collection("users").document(str(admin_id)).set(
+        {
+            "id": admin_id,
+            "name": config.BOOTSTRAP_ADMIN_NAME,
+            "email": email,
+            "password_hash": password_hash,
+            "role": "admin",
+            "is_active": True,
+            "email_verified": True,
+            "created_at": utcnow(),
+            "last_login": None,
+            "google_id": None,
+            "avatar_url": None,
+        }
+    )
+    ensure_user_progress(db, admin_id)
+
+
+_validate_runtime_config()
+_ensure_bootstrap_admin()
 
 from routes.admin import admin_bp
 from routes.auth import auth_bp
@@ -68,8 +142,7 @@ def health():
     return jsonify(
         {
             "status": "ok",
-            "db_host": config.DB_HOST,
-            "db_name": config.DB_NAME,
+            "firebase_project_id": config.FIREBASE_PROJECT_ID,
             "gemini_configured": bool(config.GEMINI_API_KEY),
             "openai_configured": bool(config.OPENAI_API_KEY),
             "ai_provider": ai_settings.get("provider"),
@@ -107,7 +180,7 @@ if __name__ == "__main__":
     print("=" * 60)
     print(f"Frontend : {FRONTEND_DIR}")
     print(f"Uploads  : {config.UPLOAD_FOLDER}")
-    print(f"DB       : {config.DB_USER}@{config.DB_HOST}:{config.DB_PORT}/{config.DB_NAME}")
+    print(f"Firestore: {config.FIREBASE_PROJECT_ID or 'default credentials'}")
     print(f"Gemini   : {'enabled' if config.GEMINI_API_KEY else 'disabled'}")
     print(f"Student  : http://localhost:{config.PORT}")
     print(f"Admin    : http://localhost:{config.PORT}/admin.html")

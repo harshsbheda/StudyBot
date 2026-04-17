@@ -151,19 +151,10 @@ CREATE TABLE IF NOT EXISTS ai_usage_counters (
 );
 
 -- ══════════════════════════════════════════
--- Default admin account
--- Email: admin@studybot.com
--- Password: Admin@1234
+-- Admin account
+-- Create the admin manually after deployment.
 -- ══════════════════════════════════════════
-INSERT IGNORE INTO users (name, email, password_hash, role)
-VALUES (
-    'Admin',
-    'admin@studybot.com',
-    '$2b$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
-    'admin'
-);
-
-INSERT IGNORE INTO user_progress (user_id)
-SELECT id FROM users WHERE email = 'admin@studybot.com';
+-- Create admin users manually with a unique password.
+-- Do not ship a shared default admin account in production.
 
 SELECT 'Database setup complete!' AS Status;

@@ -4,23 +4,14 @@ from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
 import json
 import os
 import uuid
+from datetime import datetime
 
 import config
-from database.db import get_db
+from database.db import get_db, get_next_id, ensure_user_progress, increment_user_progress, utcnow
 from services.ai_service import get_key_topics
 from services.file_processor import extract_text, get_file_type
 
 materials_bp = Blueprint("materials", __name__)
-
-_schema_ready = False
-
-
-def _safe_close(cur, db):
-    try:
-        cur.close()
-        db.close()
-    except Exception:
-        pass
 
 
 def _jwt_user():
@@ -28,68 +19,61 @@ def _jwt_user():
     return int(get_jwt_identity())
 
 
-def _ensure_subject_schema():
-    global _schema_ready
-    if _schema_ready:
-        return
-
-    db = get_db()
-    cur = db.cursor()
-    try:
-        cur.execute(
-            """CREATE TABLE IF NOT EXISTS subjects (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                user_id INT NOT NULL,
-                name VARCHAR(150) NOT NULL,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE KEY uniq_user_subject (user_id, name),
-                INDEX idx_subject_user (user_id),
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-            )"""
-        )
-
-        cur.execute("SHOW COLUMNS FROM study_materials LIKE 'subject_id'")
-        if not cur.fetchone():
-            cur.execute("ALTER TABLE study_materials ADD COLUMN subject_id INT NULL")
-            cur.execute("ALTER TABLE study_materials ADD INDEX idx_subject_id (subject_id)")
-
-        db.commit()
-        _schema_ready = True
-    finally:
-        _safe_close(cur, db)
+def _to_iso(dt):
+    if isinstance(dt, datetime):
+        return dt.isoformat()
+    return str(dt) if dt else None
 
 
-def _get_subject(user_id: int, subject_id: int):
-    db = get_db()
-    cur = db.cursor(dictionary=True)
-    cur.execute("SELECT id, name FROM subjects WHERE id=%s AND user_id=%s", (subject_id, user_id))
-    subject = cur.fetchone()
-    _safe_close(cur, db)
-    return subject
+def _sort_by_dt(items, field: str, reverse: bool = True):
+    def _key(item):
+        value = item.get(field)
+        if isinstance(value, datetime):
+            return value
+        if isinstance(value, str):
+            try:
+                return datetime.fromisoformat(value)
+            except Exception:
+                return datetime.min
+        return datetime.min
+
+    return sorted(items, key=_key, reverse=reverse)
 
 
-def _resolve_subject(cur, user_id: int, subject_id=None, subject_name: str = ""):
-    sid = None
-    sname = (subject_name or "").strip()
+def _get_subject(db, user_id: int, subject_id: int):
+    doc = db.collection("subjects").document(str(subject_id)).get()
+    if not doc.exists:
+        return None
+    data = doc.to_dict() or {}
+    if data.get("user_id") != user_id:
+        return None
+    return data
 
+
+def _resolve_subject(db, user_id: int, subject_id=None, subject_name: str = ""):
     if subject_id:
         sid = int(subject_id)
-        cur.execute("SELECT id, name FROM subjects WHERE id=%s AND user_id=%s", (sid, user_id))
-        row = cur.fetchone()
-        if not row:
+        subject = _get_subject(db, user_id, sid)
+        if not subject:
             raise ValueError("Subject not found")
-        return row["id"], row["name"]
+        return subject["id"], subject["name"]
 
-    if not sname:
-        sname = "General"
+    sname = (subject_name or "").strip() or "General"
+    existing = (
+        db.collection("subjects")
+        .where("user_id", "==", user_id)
+        .where("name", "==", sname)
+        .limit(1)
+        .get()
+    )
+    if existing:
+        subject = existing[0].to_dict()
+        return subject["id"], subject["name"]
 
-    cur.execute("SELECT id FROM subjects WHERE user_id=%s AND name=%s", (user_id, sname))
-    row = cur.fetchone()
-    if row:
-        sid = row["id"]
-    else:
-        cur.execute("INSERT INTO subjects (user_id, name) VALUES (%s, %s)", (user_id, sname))
-        sid = cur.lastrowid
+    sid = get_next_id("subjects")
+    db.collection("subjects").document(str(sid)).set(
+        {"id": sid, "user_id": user_id, "name": sname, "created_at": utcnow()}
+    )
     return sid, sname
 
 
@@ -97,25 +81,31 @@ def _resolve_subject(cur, user_id: int, subject_id=None, subject_name: str = "")
 def list_subjects():
     try:
         user_id = _jwt_user()
-        _ensure_subject_schema()
-
         db = get_db()
-        cur = db.cursor(dictionary=True)
-        cur.execute(
-            """SELECT s.id, s.name, s.created_at, COUNT(sm.id) AS material_count
-               FROM subjects s
-               LEFT JOIN study_materials sm ON sm.subject_id = s.id
-               WHERE s.user_id = %s
-               GROUP BY s.id, s.name, s.created_at
-               ORDER BY s.created_at DESC""",
-            (user_id,),
-        )
-        rows = cur.fetchall()
-        _safe_close(cur, db)
 
-        for row in rows:
-            if row.get("created_at"):
-                row["created_at"] = str(row["created_at"])
+        subjects = (
+            db.collection("subjects")
+            .where("user_id", "==", user_id)
+            .get()
+        )
+
+        materials = (
+            db.collection("study_materials").where("user_id", "==", user_id).get()
+        )
+        counts = {}
+        for m in materials:
+            data = m.to_dict() or {}
+            sid = data.get("subject_id")
+            if sid is not None:
+                counts[sid] = counts.get(sid, 0) + 1
+
+        subjects_list = [doc.to_dict() or {} for doc in subjects]
+        subjects_list = _sort_by_dt(subjects_list, "created_at", reverse=True)
+        rows = []
+        for s in subjects_list:
+            s["created_at"] = _to_iso(s.get("created_at"))
+            s["material_count"] = counts.get(s.get("id"), 0)
+            rows.append(s)
 
         return jsonify(rows), 200
     except Exception as e:
@@ -126,26 +116,26 @@ def list_subjects():
 def create_subject():
     try:
         user_id = _jwt_user()
-        _ensure_subject_schema()
-
         data = request.get_json(force=True)
         name = (data.get("name") or "").strip()
         if not name:
             return jsonify({"error": "Subject name is required"}), 400
 
         db = get_db()
-        cur = db.cursor(dictionary=True)
-        cur.execute("SELECT id FROM subjects WHERE user_id=%s AND name=%s", (user_id, name))
-        existing = cur.fetchone()
+        existing = (
+            db.collection("subjects")
+            .where("user_id", "==", user_id)
+            .where("name", "==", name)
+            .limit(1)
+            .get()
+        )
         if existing:
-            _safe_close(cur, db)
             return jsonify({"error": "Subject already exists"}), 409
 
-        cur.execute("INSERT INTO subjects (user_id, name) VALUES (%s, %s)", (user_id, name))
-        db.commit()
-        sid = cur.lastrowid
-        _safe_close(cur, db)
-
+        sid = get_next_id("subjects")
+        db.collection("subjects").document(str(sid)).set(
+            {"id": sid, "user_id": user_id, "name": name, "created_at": utcnow()}
+        )
         return jsonify({"id": sid, "name": name}), 201
     except Exception as e:
         return jsonify({"error": f"Error: {e}"}), 500
@@ -155,24 +145,28 @@ def create_subject():
 def rename_subject(sid):
     try:
         user_id = _jwt_user()
-        _ensure_subject_schema()
-
         data = request.get_json(force=True)
         name = (data.get("name") or "").strip()
         if not name:
             return jsonify({"error": "Subject name is required"}), 400
 
         db = get_db()
-        cur = db.cursor(dictionary=True)
-        cur.execute("SELECT id FROM subjects WHERE id=%s AND user_id=%s", (sid, user_id))
-        if not cur.fetchone():
-            _safe_close(cur, db)
+        subject = _get_subject(db, user_id, sid)
+        if not subject:
             return jsonify({"error": "Subject not found"}), 404
 
-        cur.execute("UPDATE subjects SET name=%s WHERE id=%s AND user_id=%s", (name, sid, user_id))
-        cur.execute("UPDATE study_materials SET subject=%s WHERE subject_id=%s AND user_id=%s", (name, sid, user_id))
-        db.commit()
-        _safe_close(cur, db)
+        db.collection("subjects").document(str(sid)).set({"name": name}, merge=True)
+
+        mats = (
+            db.collection("study_materials")
+            .where("user_id", "==", user_id)
+            .where("subject_id", "==", sid)
+            .get()
+        )
+        batch = db.batch()
+        for doc in mats:
+            batch.set(doc.reference, {"subject": name}, merge=True)
+        batch.commit()
 
         return jsonify({"success": True}), 200
     except Exception as e:
@@ -183,31 +177,36 @@ def rename_subject(sid):
 def delete_subject(sid):
     try:
         user_id = _jwt_user()
-        _ensure_subject_schema()
-
         db = get_db()
-        cur = db.cursor(dictionary=True)
-        cur.execute("SELECT id FROM subjects WHERE id=%s AND user_id=%s", (sid, user_id))
-        if not cur.fetchone():
-            _safe_close(cur, db)
+        subject = _get_subject(db, user_id, sid)
+        if not subject:
             return jsonify({"error": "Subject not found"}), 404
 
-        cur.execute("SELECT id, file_path FROM study_materials WHERE subject_id=%s AND user_id=%s", (sid, user_id))
-        mats = cur.fetchall()
-        for m in mats:
+        mats = (
+            db.collection("study_materials")
+            .where("user_id", "==", user_id)
+            .where("subject_id", "==", sid)
+            .get()
+        )
+        for doc in mats:
+            data = doc.to_dict() or {}
+            fpath = data.get("file_path")
             try:
-                if m.get("file_path") and os.path.exists(m["file_path"]):
-                    os.remove(m["file_path"])
+                if fpath and os.path.exists(fpath):
+                    os.remove(fpath)
             except Exception:
                 pass
+            doc.reference.delete()
 
-        cur.execute("DELETE FROM study_materials WHERE subject_id=%s AND user_id=%s", (sid, user_id))
-        cur.execute("DELETE FROM subjects WHERE id=%s AND user_id=%s", (sid, user_id))
-        db.commit()
+        db.collection("subjects").document(str(sid)).delete()
 
-        cur.execute("UPDATE user_progress SET materials_uploaded=(SELECT COUNT(*) FROM study_materials WHERE user_id=%s) WHERE user_id=%s", (user_id, user_id))
-        db.commit()
-        _safe_close(cur, db)
+        remaining = (
+            db.collection("study_materials").where("user_id", "==", user_id).get()
+        )
+        ensure_user_progress(db, user_id)
+        db.collection("user_progress").document(str(user_id)).set(
+            {"materials_uploaded": len(remaining)}, merge=True
+        )
 
         return jsonify({"success": True}), 200
     except Exception as e:
@@ -218,27 +217,22 @@ def delete_subject(sid):
 def materials_by_subject(sid):
     try:
         user_id = _jwt_user()
-        _ensure_subject_schema()
-
-        if not _get_subject(user_id, sid):
+        db = get_db()
+        if not _get_subject(db, user_id, sid):
             return jsonify({"error": "Subject not found"}), 404
 
-        db = get_db()
-        cur = db.cursor(dictionary=True)
-        cur.execute(
-            """SELECT id, subject_id, title, subject, file_type, file_size, key_topics, created_at
-               FROM study_materials
-               WHERE user_id=%s AND subject_id=%s
-               ORDER BY created_at DESC""",
-            (user_id, sid),
+        mats = (
+            db.collection("study_materials")
+            .where("user_id", "==", user_id)
+            .where("subject_id", "==", sid)
+            .get()
         )
-        rows = cur.fetchall()
-        _safe_close(cur, db)
-
-        for row in rows:
-            if row.get("created_at"):
-                row["created_at"] = str(row["created_at"])
-
+        mats_list = [doc.to_dict() or {} for doc in mats]
+        mats_list = _sort_by_dt(mats_list, "created_at", reverse=True)
+        rows = []
+        for m in mats_list:
+            m["created_at"] = _to_iso(m.get("created_at"))
+            rows.append(m)
         return jsonify(rows), 200
     except Exception as e:
         return jsonify({"error": f"Error: {e}"}), 500
@@ -248,31 +242,30 @@ def materials_by_subject(sid):
 def subject_topics(sid):
     try:
         user_id = _jwt_user()
-        _ensure_subject_schema()
-
-        if not _get_subject(user_id, sid):
+        db = get_db()
+        if not _get_subject(db, user_id, sid):
             return jsonify({"error": "Subject not found"}), 404
 
-        db = get_db()
-        cur = db.cursor(dictionary=True)
-        cur.execute(
-            "SELECT key_topics, extracted_text FROM study_materials WHERE user_id=%s AND subject_id=%s",
-            (user_id, sid),
+        mats = (
+            db.collection("study_materials")
+            .where("user_id", "==", user_id)
+            .where("subject_id", "==", sid)
+            .get()
         )
-        rows = cur.fetchall()
-        _safe_close(cur, db)
 
         merged_topics = []
         combined_text = []
-        for row in rows:
-            kt = row.get("key_topics")
-            if kt:
+        for doc in mats:
+            row = doc.to_dict() or {}
+            kt = row.get("key_topics") or []
+            if isinstance(kt, str):
                 try:
-                    for item in json.loads(kt):
-                        if item not in merged_topics:
-                            merged_topics.append(item)
+                    kt = json.loads(kt)
                 except Exception:
-                    pass
+                    kt = []
+            for item in kt:
+                if item not in merged_topics:
+                    merged_topics.append(item)
             txt = row.get("extracted_text") or ""
             if txt.strip():
                 combined_text.append(txt)
@@ -289,7 +282,6 @@ def subject_topics(sid):
 def upload():
     try:
         user_id = _jwt_user()
-        _ensure_subject_schema()
     except Exception as e:
         return jsonify({"error": "Unauthorized: " + str(e)}), 401
 
@@ -300,34 +292,12 @@ def upload():
 
     if not file or file.filename == "":
         return jsonify({"error": "No file provided"}), 400
-
     if not title:
         return jsonify({"error": "Title is required"}), 400
 
     try:
         db = get_db()
-        cur = db.cursor(dictionary=True)
-
-        sid = None
-        if subject_id:
-            sid = int(subject_id)
-            cur.execute("SELECT id, name FROM subjects WHERE id=%s AND user_id=%s", (sid, user_id))
-            row = cur.fetchone()
-            if not row:
-                _safe_close(cur, db)
-                return jsonify({"error": "Subject not found"}), 404
-            subject_name = row["name"]
-        else:
-            if not subject_name:
-                subject_name = "General"
-            cur.execute("SELECT id FROM subjects WHERE user_id=%s AND name=%s", (user_id, subject_name))
-            row = cur.fetchone()
-            if row:
-                sid = row["id"]
-            else:
-                cur.execute("INSERT INTO subjects (user_id, name) VALUES (%s, %s)", (user_id, subject_name))
-                db.commit()
-                sid = cur.lastrowid
+        sid, sname = _resolve_subject(db, user_id, subject_id, subject_name)
 
         ftype = get_file_type(file.filename)
         fname = f"{uuid.uuid4()}_{file.filename}"
@@ -346,28 +316,41 @@ def upload():
         except Exception:
             topics = []
 
-        cur.execute(
-            """INSERT INTO study_materials
-               (user_id, subject_id, title, subject, filename, file_path, file_type, file_size, extracted_text, key_topics)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-            (user_id, sid, title, subject_name, file.filename, path, ftype, os.path.getsize(path), text, json.dumps(topics, ensure_ascii=False)),
+        mid = get_next_id("study_materials")
+        db.collection("study_materials").document(str(mid)).set(
+            {
+                "id": mid,
+                "user_id": user_id,
+                "subject_id": sid,
+                "title": title,
+                "subject": sname,
+                "filename": file.filename,
+                "file_path": path,
+                "file_type": ftype,
+                "file_size": os.path.getsize(path),
+                "extracted_text": text,
+                "key_topics": topics,
+                "created_at": utcnow(),
+            }
         )
-        db.commit()
-        mid = cur.lastrowid
 
-        cur.execute("UPDATE user_progress SET materials_uploaded = materials_uploaded + 1 WHERE user_id=%s", (user_id,))
-        db.commit()
-        _safe_close(cur, db)
+        ensure_user_progress(db, user_id)
+        increment_user_progress(db, user_id, "materials_uploaded", 1)
 
-        return jsonify({
-            "id": mid,
-            "subject_id": sid,
-            "title": title,
-            "subject": subject_name,
-            "file_type": ftype,
-            "key_topics": topics,
-            "message": "Material uploaded and processed successfully",
-        }), 201
+        return (
+            jsonify(
+                {
+                    "id": mid,
+                    "subject_id": sid,
+                    "title": title,
+                    "subject": sname,
+                    "file_type": ftype,
+                    "key_topics": topics,
+                    "message": "Material uploaded and processed successfully",
+                }
+            ),
+            201,
+        )
     except Exception as e:
         return jsonify({"error": f"Database error: {e}"}), 500
 
@@ -376,7 +359,6 @@ def upload():
 def upload_multiple():
     try:
         user_id = _jwt_user()
-        _ensure_subject_schema()
     except Exception as e:
         return jsonify({"error": "Unauthorized: " + str(e)}), 401
 
@@ -388,10 +370,7 @@ def upload_multiple():
 
     try:
         db = get_db()
-        cur = db.cursor(dictionary=True)
-
-        sid, sname = _resolve_subject(cur, user_id, subject_id, subject_name)
-        db.commit()
+        sid, sname = _resolve_subject(db, user_id, subject_id, subject_name)
 
         created = []
         for file in files:
@@ -416,34 +395,32 @@ def upload_multiple():
             except Exception:
                 topics = []
 
-            cur.execute(
-                """INSERT INTO study_materials
-                   (user_id, subject_id, title, subject, filename, file_path, file_type, file_size, extracted_text, key_topics)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-                (
-                    user_id,
-                    sid,
-                    title,
-                    sname,
-                    file.filename,
-                    path,
-                    ftype,
-                    os.path.getsize(path),
-                    text,
-                    json.dumps(topics, ensure_ascii=False),
-                ),
+            mid = get_next_id("study_materials")
+            db.collection("study_materials").document(str(mid)).set(
+                {
+                    "id": mid,
+                    "user_id": user_id,
+                    "subject_id": sid,
+                    "title": title,
+                    "subject": sname,
+                    "filename": file.filename,
+                    "file_path": path,
+                    "file_type": ftype,
+                    "file_size": os.path.getsize(path),
+                    "extracted_text": text,
+                    "key_topics": topics,
+                    "created_at": utcnow(),
+                }
             )
-            created.append({"id": cur.lastrowid, "title": title})
+            created.append({"id": mid, "title": title})
 
-        db.commit()
-        cur.execute(
-            "UPDATE user_progress SET materials_uploaded = materials_uploaded + %s WHERE user_id=%s",
-            (len(created), user_id),
+        ensure_user_progress(db, user_id)
+        increment_user_progress(db, user_id, "materials_uploaded", len(created))
+
+        return (
+            jsonify({"success": True, "subject_id": sid, "created": created, "count": len(created)}),
+            201,
         )
-        db.commit()
-        _safe_close(cur, db)
-
-        return jsonify({"success": True, "subject_id": sid, "created": created, "count": len(created)}), 201
     except ValueError as e:
         return jsonify({"error": str(e)}), 404
     except Exception as e:
@@ -454,27 +431,22 @@ def upload_multiple():
 def list_materials():
     try:
         user_id = _jwt_user()
-        _ensure_subject_schema()
     except Exception as e:
         return jsonify({"error": "Unauthorized: " + str(e)}), 401
 
     try:
         db = get_db()
-        cur = db.cursor(dictionary=True)
-        cur.execute(
-            """SELECT id, subject_id, title, subject, file_type, file_size, key_topics, created_at
-               FROM study_materials
-               WHERE user_id = %s
-               ORDER BY created_at DESC""",
-            (user_id,),
+        mats = (
+            db.collection("study_materials")
+            .where("user_id", "==", user_id)
+            .get()
         )
-        rows = cur.fetchall()
-        _safe_close(cur, db)
-
-        for row in rows:
-            if row.get("created_at"):
-                row["created_at"] = str(row["created_at"])
-
+        mats_list = [doc.to_dict() or {} for doc in mats]
+        mats_list = _sort_by_dt(mats_list, "created_at", reverse=True)
+        rows = []
+        for m in mats_list:
+            m["created_at"] = _to_iso(m.get("created_at"))
+            rows.append(m)
         return jsonify(rows), 200
     except Exception as e:
         return jsonify({"error": f"Database error: {e}"}), 500
@@ -489,22 +461,13 @@ def get_material(mid):
 
     try:
         db = get_db()
-        cur = db.cursor(dictionary=True)
-        cur.execute(
-            """SELECT id, subject_id, title, subject, file_type, file_size, key_topics, created_at
-               FROM study_materials
-               WHERE id = %s AND user_id = %s""",
-            (mid, user_id),
-        )
-        mat = cur.fetchone()
-        _safe_close(cur, db)
-
-        if not mat:
+        doc = db.collection("study_materials").document(str(mid)).get()
+        if not doc.exists:
             return jsonify({"error": "Material not found"}), 404
-
-        if mat.get("created_at"):
-            mat["created_at"] = str(mat["created_at"])
-
+        mat = doc.to_dict() or {}
+        if mat.get("user_id") != user_id:
+            return jsonify({"error": "Material not found"}), 404
+        mat["created_at"] = _to_iso(mat.get("created_at"))
         return jsonify(mat), 200
     except Exception as e:
         return jsonify({"error": f"Database error: {e}"}), 500
@@ -519,18 +482,13 @@ def get_topics(mid):
 
     try:
         db = get_db()
-        cur = db.cursor(dictionary=True)
-        cur.execute(
-            "SELECT key_topics FROM study_materials WHERE id = %s AND user_id = %s",
-            (mid, user_id),
-        )
-        mat = cur.fetchone()
-        _safe_close(cur, db)
-
-        if not mat:
+        doc = db.collection("study_materials").document(str(mid)).get()
+        if not doc.exists:
             return jsonify({"error": "Material not found"}), 404
-
-        return jsonify({"key_topics": mat.get("key_topics")}), 200
+        mat = doc.to_dict() or {}
+        if mat.get("user_id") != user_id:
+            return jsonify({"error": "Material not found"}), 404
+        return jsonify({"key_topics": mat.get("key_topics") or []}), 200
     except Exception as e:
         return jsonify({"error": f"Database error: {e}"}), 500
 
@@ -544,11 +502,11 @@ def delete_material(mid):
 
     try:
         db = get_db()
-        cur = db.cursor(dictionary=True)
-        cur.execute("SELECT file_path FROM study_materials WHERE id=%s AND user_id=%s", (mid, user_id))
-        mat = cur.fetchone()
-        if not mat:
-            _safe_close(cur, db)
+        doc = db.collection("study_materials").document(str(mid)).get()
+        if not doc.exists:
+            return jsonify({"error": "Material not found"}), 404
+        mat = doc.to_dict() or {}
+        if mat.get("user_id") != user_id:
             return jsonify({"error": "Material not found"}), 404
 
         try:
@@ -557,11 +515,14 @@ def delete_material(mid):
         except Exception:
             pass
 
-        cur.execute("DELETE FROM study_materials WHERE id=%s", (mid,))
-        db.commit()
-        cur.execute("UPDATE user_progress SET materials_uploaded = GREATEST(materials_uploaded - 1, 0) WHERE user_id=%s", (user_id,))
-        db.commit()
-        _safe_close(cur, db)
+        doc.reference.delete()
+        remaining = (
+            db.collection("study_materials").where("user_id", "==", user_id).get()
+        )
+        ensure_user_progress(db, user_id)
+        db.collection("user_progress").document(str(user_id)).set(
+            {"materials_uploaded": len(remaining)}, merge=True
+        )
 
         return jsonify({"success": True, "message": "Material deleted"}), 200
     except Exception as e:
@@ -572,7 +533,6 @@ def delete_material(mid):
 def update_material(mid):
     try:
         user_id = _jwt_user()
-        _ensure_subject_schema()
     except Exception as e:
         return jsonify({"error": "Unauthorized: " + str(e)}), 401
 
@@ -583,26 +543,23 @@ def update_material(mid):
         new_subject_name = (data.get("subject") or "").strip()
 
         db = get_db()
-        cur = db.cursor(dictionary=True)
-        cur.execute("SELECT id, title, subject_id, subject FROM study_materials WHERE id=%s AND user_id=%s", (mid, user_id))
-        mat = cur.fetchone()
-        if not mat:
-            _safe_close(cur, db)
+        doc = db.collection("study_materials").document(str(mid)).get()
+        if not doc.exists:
+            return jsonify({"error": "Material not found"}), 404
+        mat = doc.to_dict() or {}
+        if mat.get("user_id") != user_id:
             return jsonify({"error": "Material not found"}), 404
 
-        update_title = new_title if new_title else mat["title"]
+        update_title = new_title if new_title else mat.get("title")
         update_sid = mat.get("subject_id")
         update_sname = mat.get("subject") or "General"
 
         if new_subject_id or new_subject_name:
-            update_sid, update_sname = _resolve_subject(cur, user_id, new_subject_id, new_subject_name)
+            update_sid, update_sname = _resolve_subject(db, user_id, new_subject_id, new_subject_name)
 
-        cur.execute(
-            "UPDATE study_materials SET title=%s, subject_id=%s, subject=%s WHERE id=%s AND user_id=%s",
-            (update_title, update_sid, update_sname, mid, user_id),
+        db.collection("study_materials").document(str(mid)).set(
+            {"title": update_title, "subject_id": update_sid, "subject": update_sname}, merge=True
         )
-        db.commit()
-        _safe_close(cur, db)
         return jsonify({"success": True}), 200
     except ValueError as e:
         return jsonify({"error": str(e)}), 404

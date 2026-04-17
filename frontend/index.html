@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>StudyBot - AI Study Assistant</title>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -33,8 +33,10 @@
       </div>
       <div id="loginError" class="auth-error hidden"></div>
       <button class="btn-primary" onclick="login()">Sign In</button>
+      <p class="auth-switch"><a href="#" onclick="openResetModal()">Forgot password?</a></p>
       <div class="divider"><span>or</span></div>
       <button class="btn-google" onclick="googleLogin()">Continue with Google</button>
+      <p class="auth-switch auth-help-link"><a href="#" onclick="return openGoogleHelpModal(event)">Use a different Google account?</a></p>
       <p class="auth-switch">No account? <a href="#" onclick="showRegister()">Create one</a></p>
     </div>
 
@@ -56,6 +58,7 @@
       <button class="btn-primary" onclick="register()">Create Account</button>
       <div class="divider"><span>or</span></div>
       <button class="btn-google" onclick="googleLogin()">Continue with Google</button>
+      <p class="auth-switch auth-help-link"><a href="#" onclick="return openGoogleHelpModal(event)">Use a different Google account?</a></p>
       <p class="auth-switch">Have account? <a href="#" onclick="showLogin()">Sign in</a></p>
     </div>
   </div>
@@ -65,23 +68,68 @@
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
       <div class="sb-brand">
-        <span class="sb-icon">SB</span>
+        <span class="sb-icon brand-glyph" aria-hidden="true">
+          <svg viewBox="0 0 24 24" class="ui-icon">
+            <path d="M12 3 18 9 12 15 6 9 12 3Z"/>
+            <circle cx="12" cy="9" r="1.5"/>
+            <path d="M12 15v4"/>
+          </svg>
+        </span>
         <span class="sb-name">StudyBot</span>
       </div>
-      <button class="sb-toggle" onclick="toggleSidebar()">Menu</button>
     </div>
 
     <nav class="sb-nav">
-      <button class="nav-btn active" data-tab="chat" onclick="switchTab('chat', this)">
+      <button class="nav-btn active" data-tab="dashboard" onclick="switchTab('dashboard', this)">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" class="ui-icon">
+            <rect x="4" y="4" width="6" height="6" rx="1.3"/>
+            <rect x="14" y="4" width="6" height="6" rx="1.3"/>
+            <rect x="4" y="14" width="6" height="6" rx="1.3"/>
+            <rect x="14" y="14" width="6" height="6" rx="1.3"/>
+          </svg>
+        </span>
+        <span class="nav-label">Dashboard</span>
+      </button>
+      <button class="nav-btn" data-tab="chat" onclick="switchTab('chat', this)">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" class="ui-icon">
+            <path d="M7 8.5A2.5 2.5 0 0 1 9.5 6h5A2.5 2.5 0 0 1 17 8.5v3A2.5 2.5 0 0 1 14.5 14H11l-4 4v-4A2.5 2.5 0 0 1 7 11.5Z"/>
+          </svg>
+        </span>
         <span class="nav-label">Chat</span>
       </button>
       <button class="nav-btn" data-tab="materials" onclick="switchTab('materials', this)">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" class="ui-icon">
+            <path d="M9.5 4.5h5.5l3 3V19a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 8 19V6A1.5 1.5 0 0 1 9.5 4.5Z"/>
+            <path d="M15 4.5V8h3"/>
+            <path d="M10 12h6"/>
+            <path d="M10 15h5"/>
+          </svg>
+        </span>
         <span class="nav-label">Materials</span>
       </button>
       <button class="nav-btn" data-tab="tests" onclick="switchTab('tests', this)">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" class="ui-icon">
+            <path d="M9 4h6"/>
+            <path d="M9.5 6h5A1.5 1.5 0 0 1 16 7.5V19a1.5 1.5 0 0 1-1.5 1.5h-5A1.5 1.5 0 0 1 8 19V7.5A1.5 1.5 0 0 1 9.5 6Z"/>
+            <path d="m10.5 13 1.5 1.5 3-3"/>
+          </svg>
+        </span>
         <span class="nav-label">Tests</span>
       </button>
       <button class="nav-btn" data-tab="progress" onclick="switchTab('progress', this)">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" class="ui-icon">
+            <path d="M5 19.5h14"/>
+            <path d="M8 16V10"/>
+            <path d="M12 16V7"/>
+            <path d="M16 16v-4"/>
+            <path d="m7 9 4-3 5 4 2-2"/>
+          </svg>
+        </span>
         <span class="nav-label">Progress</span>
       </button>
     </nav>
@@ -115,7 +163,21 @@
   </aside>
 
   <main class="main-content">
-    <section id="tab-chat" class="tab-content active">
+    <section id="tab-dashboard" class="tab-content active">
+      <div class="tab-topbar">
+        <div>
+          <h2 class="tab-title">Dashboard</h2>
+          <p class="tab-subtitle">Your study snapshot</p>
+        </div>
+        <div class="chat-actions">
+          <button class="btn-action-sm" onclick="switchTab('materials')">Upload</button>
+          <button class="btn-action-sm" onclick="switchTab('tests')">Take Test</button>
+        </div>
+      </div>
+      <div class="dashboard-grid" id="dashboardGrid"></div>
+    </section>
+
+    <section id="tab-chat" class="tab-content">
       <div class="chat-topbar">
         <div>
           <h2 class="tab-title">Chat</h2>
@@ -190,6 +252,140 @@
       <div id="progressContent" class="progress-grid"></div>
     </section>
   </main>
+</div>
+
+<div class="mobile-nav">
+  <button class="mobile-nav-btn active" data-tab="dashboard" onclick="switchTab('dashboard', this)"><span class="mobile-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" class="ui-icon"><rect x="4" y="4" width="6" height="6" rx="1.3"/><rect x="14" y="4" width="6" height="6" rx="1.3"/><rect x="4" y="14" width="6" height="6" rx="1.3"/><rect x="14" y="14" width="6" height="6" rx="1.3"/></svg></span><span class="mobile-nav-label">Home</span></button>
+  <button class="mobile-nav-btn" data-tab="chat" onclick="switchTab('chat', this)"><span class="mobile-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" class="ui-icon"><path d="M7 8.5A2.5 2.5 0 0 1 9.5 6h5A2.5 2.5 0 0 1 17 8.5v3A2.5 2.5 0 0 1 14.5 14H11l-4 4v-4A2.5 2.5 0 0 1 7 11.5Z"/></svg></span><span class="mobile-nav-label">Chat</span></button>
+  <button class="mobile-nav-btn" data-tab="materials" onclick="switchTab('materials', this)"><span class="mobile-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" class="ui-icon"><path d="M9.5 4.5h5.5l3 3V19a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 8 19V6A1.5 1.5 0 0 1 9.5 4.5Z"/><path d="M15 4.5V8h3"/><path d="M10 12h6"/><path d="M10 15h5"/></svg></span><span class="mobile-nav-label">Files</span></button>
+  <button class="mobile-nav-btn" data-tab="tests" onclick="switchTab('tests', this)"><span class="mobile-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" class="ui-icon"><path d="M9 4h6"/><path d="M9.5 6h5A1.5 1.5 0 0 1 16 7.5V19a1.5 1.5 0 0 1-1.5 1.5h-5A1.5 1.5 0 0 1 8 19V7.5A1.5 1.5 0 0 1 9.5 6Z"/><path d="m10.5 13 1.5 1.5 3-3"/></svg></span><span class="mobile-nav-label">Tests</span></button>
+</div>
+
+<div id="googleHelpModal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Google Sign-In Help</h3>
+      <button class="modal-close" onclick="closeModal('googleHelpModal')">X</button>
+    </div>
+    <div class="modal-body">
+      <p class="google-help-intro">To sign in with a new Google ID, follow these steps:</p>
+      <div class="google-steps">
+        <div class="google-step">
+          <strong>1. Start Google sign-in</strong>
+          <span>Click <code>Continue with Google</code>.</span>
+        </div>
+        <div class="google-step">
+          <strong>2. Choose another account</strong>
+          <span>In the Google popup, click <code>Use another account</code> if your old Gmail is shown first.</span>
+        </div>
+        <div class="google-step">
+          <strong>3. Enter the new Gmail</strong>
+          <span>Type the new Google email and password, then continue.</span>
+        </div>
+        <div class="google-step">
+          <strong>4. Allow access</strong>
+          <span>Approve the Google sign-in request so StudyBot can complete login.</span>
+        </div>
+      </div>
+      <div class="google-help-note">
+        If the popup already opens with the wrong Gmail, first sign out from that Google account in the popup, then choose <code>Use another account</code>. If no popup appears, allow popups for this site and try again.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('googleHelpModal')">Close</button>
+      <button class="btn-primary" onclick="closeModal('googleHelpModal'); googleLogin(true);">Continue with Google</button>
+    </div>
+  </div>
+</div>
+
+<div id="resetModal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Reset Password</h3>
+      <button class="modal-close" onclick="closeModal('resetModal')">X</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="resetEmail" placeholder="you@email.com" />
+      </div>
+      <div class="form-group">
+        <label>Reset Code</label>
+        <input type="text" id="resetToken" placeholder="Code from email" />
+        <small id="resetTokenHint" style="color:var(--text-faint)"></small>
+      </div>
+      <div class="form-group">
+        <label>New Password</label>
+        <input type="password" id="resetPassword" placeholder="Min 6 characters" />
+      </div>
+      <div id="resetError" class="auth-error hidden"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="requestResetCode()">Get Code</button>
+      <button class="btn-primary" onclick="resetPassword()">Reset Password</button>
+    </div>
+  </div>
+</div>
+
+<div id="verifyEmailModal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Verify Email</h3>
+      <button class="modal-close" onclick="closeModal('verifyEmailModal')">X</button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--text-muted);margin-bottom:10px">Enter the OTP sent to your email.</p>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="verifyEmail" placeholder="you@email.com" />
+      </div>
+      <div class="form-group">
+        <label>OTP</label>
+        <input type="text" id="verifyOtp" placeholder="Enter OTP" />
+      </div>
+      <div id="verifyError" class="auth-error hidden"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="resendVerifyOtp()">Resend OTP</button>
+      <button class="btn-primary" onclick="verifyEmailOtp()">Verify</button>
+    </div>
+  </div>
+</div>
+
+<div id="profileModal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Edit Profile</h3>
+      <button class="modal-close" onclick="closeModal('profileModal')">X</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Name</label>
+        <input type="text" id="profileName" placeholder="Your name" />
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="profileEmail" placeholder="you@email.com" />
+      </div>
+      <div class="form-group">
+        <label>Phone</label>
+        <input type="text" id="profilePhone" placeholder="+91 98765 43210" />
+      </div>
+      <div class="form-group">
+        <label>Avatar URL</label>
+        <input type="text" id="profileAvatar" placeholder="https://..." />
+      </div>
+      <div class="form-group">
+        <label>Bio</label>
+        <textarea id="profileBio" rows="3" placeholder="Tell us about your goals"></textarea>
+      </div>
+      <div id="profileError" class="auth-error hidden"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('profileModal')">Cancel</button>
+      <button class="btn-primary" onclick="saveProfile()">Save</button>
+    </div>
+  </div>
 </div>
 
 <div id="uploadModal" class="modal-overlay hidden">
@@ -302,6 +498,19 @@
   </div>
 </div>
 
+<div id="reviewModal" class="modal-overlay hidden">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <h3 id="reviewTitle">Test Review</h3>
+      <button class="modal-close" onclick="closeModal('reviewModal')">X</button>
+    </div>
+    <div class="modal-body" id="reviewContent"></div>
+    <div class="modal-footer">
+      <button class="btn-primary" onclick="closeModal('reviewModal')">Close</button>
+    </div>
+  </div>
+</div>
+
 <div id="loadingOverlay" class="loading-overlay hidden">
   <div class="loading-box">
     <div class="loader"></div>
@@ -309,7 +518,7 @@
   </div>
 </div>
 
-<script>window.STUDYBOT_API_BASE = 'http://localhost:5000/api';</script>
+<script>window.STUDYBOT_API_BASE = window.STUDYBOT_API_BASE || '/api';</script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="js/app.js"></script>
 </body>

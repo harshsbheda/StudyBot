@@ -66,16 +66,33 @@ DB_NAME = os.getenv("DB_NAME", "studybot_db")
 DB_POOL_SIZE = _get_int("DB_POOL_SIZE", 10)
 DB_CONNECT_TIMEOUT = _get_int("DB_CONNECT_TIMEOUT", 10)
 
+# Firebase (Firestore)
+FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "")
+FIREBASE_SERVICE_ACCOUNT_JSON = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON", "")
+FIREBASE_SERVICE_ACCOUNT_JSON_RAW = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON_RAW", "")
+
 # Security
 SECRET_KEY = os.getenv("SECRET_KEY", "change-this-secret-key")
 JWT_SECRET = os.getenv("JWT_SECRET", "change-this-jwt-secret")
 JWT_EXPIRY_DAYS = _get_int("JWT_EXPIRY_DAYS", 30)
+BOOTSTRAP_ADMIN_NAME = os.getenv("BOOTSTRAP_ADMIN_NAME", "Admin").strip() or "Admin"
+BOOTSTRAP_ADMIN_EMAIL = os.getenv("BOOTSTRAP_ADMIN_EMAIL", "").strip().lower()
+BOOTSTRAP_ADMIN_PASSWORD = os.getenv("BOOTSTRAP_ADMIN_PASSWORD", "")
 
 # Google OAuth (optional)
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
 GOOGLE_ALLOWED_ORIGINS = _get_csv("GOOGLE_ALLOWED_ORIGINS")
 GOOGLE_ALLOWED_REDIRECTS = _get_csv("GOOGLE_ALLOWED_REDIRECTS")
+CORS_ALLOWED_ORIGINS = _get_csv("CORS_ALLOWED_ORIGINS")
+
+# Email (SMTP)
+SMTP_HOST = os.getenv("SMTP_HOST", "")
+SMTP_PORT = _get_int("SMTP_PORT", 587)
+SMTP_USER = os.getenv("SMTP_USER", "")
+SMTP_PASS = os.getenv("SMTP_PASS", "")
+SMTP_FROM = os.getenv("SMTP_FROM", "")
+SMTP_TLS = _get_bool("SMTP_TLS", True)
 
 # Uploads
 UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", os.path.join(BASE_DIR, "uploads"))

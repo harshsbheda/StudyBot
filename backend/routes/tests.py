@@ -1,9 +1,9 @@
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
 
-import json
+from datetime import datetime
 
-from database.db import get_db
+from database.db import get_db, get_next_id, ensure_user_progress, set_user_progress, utcnow
 from services.ai_guardrails import check_and_record_request, record_quota_hit
 from services.ai_service import evaluate_short_answer, generate_mcq_test, generate_short_answer_test, get_last_error
 
@@ -15,12 +15,25 @@ def _jwt_user():
     return int(get_jwt_identity())
 
 
-def _safe_close(cur, db):
-    try:
-        cur.close()
-        db.close()
-    except Exception:
-        pass
+def _to_iso(dt):
+    if isinstance(dt, datetime):
+        return dt.isoformat()
+    return str(dt) if dt else None
+
+
+def _sort_by_dt(items, field: str, reverse: bool = True):
+    def _key(item):
+        value = item.get(field)
+        if isinstance(value, datetime):
+            return value
+        if isinstance(value, str):
+            try:
+                return datetime.fromisoformat(value)
+            except Exception:
+                return datetime.min
+        return datetime.min
+
+    return sorted(items, key=_key, reverse=reverse)
 
 
 def _request_ai_options(data):
@@ -48,15 +61,18 @@ def _get_grade(score: float) -> str:
     return "F"
 
 
-def _combined_subject_text(cur, user_id: int, subject_id: int):
-    cur.execute(
-        "SELECT id, title, extracted_text FROM study_materials WHERE user_id=%s AND subject_id=%s ORDER BY created_at DESC",
-        (user_id, subject_id),
+def _combined_subject_text(db, user_id: int, subject_id: int):
+    mats = (
+        db.collection("study_materials")
+        .where("user_id", "==", user_id)
+        .where("subject_id", "==", subject_id)
+        .get()
     )
-    rows = cur.fetchall()
+    mats_list = [doc.to_dict() or {} for doc in mats]
+    mats_list = _sort_by_dt(mats_list, "created_at", reverse=True)
     chunks = []
     first_material_id = None
-    for row in rows:
+    for row in mats_list:
         if first_material_id is None:
             first_material_id = row.get("id")
         txt = (row.get("extracted_text") or "").strip()
@@ -76,6 +92,16 @@ def generate():
         data = request.get_json(force=True)
         material_id = data.get("material_id")
         subject_id = data.get("subject_id")
+        if material_id is not None:
+            try:
+                material_id = int(material_id)
+            except Exception:
+                material_id = None
+        if subject_id is not None:
+            try:
+                subject_id = int(subject_id)
+            except Exception:
+                subject_id = None
         ttype = data.get("type", "mcq")
         count = int(data.get("count", 10))
         diff = data.get("difficulty", "medium")
@@ -85,38 +111,34 @@ def generate():
             return jsonify({"error": "material_id or subject_id is required"}), 400
 
         db = get_db()
-        cur = db.cursor(dictionary=True)
 
         source_title = "Selected Content"
         text = ""
         material_for_test = None
 
         if material_id:
-            cur.execute("SELECT id, title, extracted_text FROM study_materials WHERE id=%s AND user_id=%s", (material_id, user_id))
-            mat = cur.fetchone()
-            if not mat:
-                _safe_close(cur, db)
+            mat_doc = db.collection("study_materials").document(str(material_id)).get()
+            if not mat_doc.exists:
+                return jsonify({"error": "Material not found"}), 404
+            mat = mat_doc.to_dict() or {}
+            if mat.get("user_id") != user_id:
                 return jsonify({"error": "Material not found"}), 404
             text = mat.get("extracted_text") or ""
             source_title = mat.get("title") or source_title
             material_for_test = mat.get("id")
         else:
-            text, material_for_test = _combined_subject_text(cur, user_id, int(subject_id))
-            cur.execute("SELECT name FROM subjects WHERE id=%s AND user_id=%s", (int(subject_id), user_id))
-            s = cur.fetchone()
-            source_title = s.get("name") if s else source_title
+            text, material_for_test = _combined_subject_text(db, user_id, int(subject_id))
+            subj = db.collection("subjects").document(str(int(subject_id))).get()
+            if subj.exists and (subj.to_dict() or {}).get("user_id") == user_id:
+                source_title = (subj.to_dict() or {}).get("name") or source_title
 
         if not material_for_test:
-            _safe_close(cur, db)
             return jsonify({"error": "No materials available in selected subject"}), 400
-
         if not text.strip():
-            _safe_close(cur, db)
             return jsonify({"error": "No text content found in selected source"}), 400
 
         guardrail = check_and_record_request(user_id, action="test_generate")
         if not guardrail.get("allowed"):
-            _safe_close(cur, db)
             return (
                 jsonify(
                     {
@@ -143,23 +165,25 @@ def generate():
             if ai_error.get("code") == "quota_exceeded":
                 retry_after = ai_error.get("retry_after", 0)
                 record_quota_hit(user_id, retry_after=retry_after)
-                _safe_close(cur, db)
                 return jsonify({"error": "AI quota exceeded. Please try again later.", "retry_after": retry_after}), 429
-
-            _safe_close(cur, db)
             if ai_error:
                 return jsonify({"error": "AI is temporarily unavailable. Please retry shortly.", "reason": ai_error.get("code", "provider_error")}), 503
             return jsonify({"error": "Could not generate questions. Try again or check AI settings."}), 500
 
         title = f"{source_title} - {ttype.replace('_', ' ').title()} Test"
-        cur.execute(
-            """INSERT INTO tests (user_id, material_id, title, test_type, questions, difficulty)
-               VALUES (%s,%s,%s,%s,%s,%s)""",
-            (user_id, material_for_test, title, ttype, json.dumps(questions, ensure_ascii=False), diff),
+        test_id = get_next_id("tests")
+        db.collection("tests").document(str(test_id)).set(
+            {
+                "id": test_id,
+                "user_id": user_id,
+                "material_id": material_for_test,
+                "title": title,
+                "test_type": ttype,
+                "questions": questions,
+                "difficulty": diff,
+                "created_at": utcnow(),
+            }
         )
-        db.commit()
-        test_id = cur.lastrowid
-        _safe_close(cur, db)
 
         return jsonify({"test_id": test_id, "title": title, "questions": questions, "count": len(questions)}), 201
     except Exception as e:
@@ -179,14 +203,12 @@ def submit(test_id):
         time_taken = int(data.get("time_taken", 0))
 
         db = get_db()
-        cur = db.cursor(dictionary=True)
-        cur.execute("SELECT * FROM tests WHERE id=%s", (test_id,))
-        test = cur.fetchone()
-        if not test:
-            _safe_close(cur, db)
+        test_doc = db.collection("tests").document(str(test_id)).get()
+        if not test_doc.exists:
             return jsonify({"error": "Test not found"}), 404
+        test = test_doc.to_dict() or {}
 
-        questions = json.loads(test["questions"])
+        questions = test.get("questions") or []
         feedback = []
         correct = 0
         total = len(questions)
@@ -226,23 +248,33 @@ def submit(test_id):
         score = round((correct / total * 100), 2) if total > 0 else 0
         grade = _get_grade(score)
 
-        cur.execute(
-            """INSERT INTO test_attempts
-               (test_id, user_id, answers, score, total_questions, correct_answers, time_taken, feedback)
-               VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
-            (test_id, user_id, json.dumps(answers, ensure_ascii=False), score, total, correct, time_taken, json.dumps(feedback, ensure_ascii=False)),
+        attempt_id = get_next_id("test_attempts")
+        db.collection("test_attempts").document(str(attempt_id)).set(
+            {
+                "id": attempt_id,
+                "test_id": test_id,
+                "user_id": user_id,
+                "title": test.get("title"),
+                "test_type": test.get("test_type"),
+                "answers": answers,
+                "score": score,
+                "total_questions": total,
+                "correct_answers": correct,
+                "time_taken": time_taken,
+                "feedback": feedback,
+                "completed_at": utcnow(),
+            }
         )
-        db.commit()
 
-        cur.execute(
-            """UPDATE user_progress
-               SET total_tests = total_tests + 1,
-                   avg_score   = (SELECT IFNULL(AVG(score),0) FROM test_attempts WHERE user_id=%s)
-               WHERE user_id=%s""",
-            (user_id, user_id),
+        attempts = (
+            db.collection("test_attempts").where("user_id", "==", user_id).get()
         )
-        db.commit()
-        _safe_close(cur, db)
+        avg_score = 0
+        if attempts:
+            avg_score = round(sum(float(a.to_dict().get("score") or 0) for a in attempts) / len(attempts), 2)
+
+        ensure_user_progress(db, user_id)
+        set_user_progress(db, user_id, {"total_tests": len(attempts), "avg_score": avg_score})
 
         return jsonify({"score": score, "grade": grade, "correct": correct, "total": total, "feedback": feedback}), 200
     except Exception as e:
@@ -258,25 +290,81 @@ def history():
 
     try:
         db = get_db()
-        cur = db.cursor(dictionary=True)
-        cur.execute(
-            """SELECT ta.id, t.title, ta.score, ta.total_questions,
-                      ta.correct_answers, ta.time_taken, ta.completed_at, t.test_type
-               FROM test_attempts ta
-               JOIN tests t ON ta.test_id = t.id
-               WHERE ta.user_id=%s
-               ORDER BY ta.completed_at DESC""",
-            (user_id,),
+        attempts = (
+            db.collection("test_attempts")
+            .where("user_id", "==", user_id)
+            .get()
         )
-        rows = cur.fetchall()
-        _safe_close(cur, db)
+        attempts_list = [a.to_dict() for a in attempts]
+        attempts_list = _sort_by_dt(attempts_list, "completed_at", reverse=True)
 
-        for r in rows:
-            if r.get("completed_at"):
-                r["completed_at"] = str(r["completed_at"])
-            if r.get("score") is not None:
-                r["score"] = float(r["score"])
+        test_ids = {a.get("test_id") for a in attempts_list}
+        tests = {}
+        if test_ids:
+            refs = [db.collection("tests").document(str(tid)) for tid in test_ids]
+            for doc in db.get_all(refs):
+                if doc.exists:
+                    tests[int(doc.id)] = doc.to_dict()
+
+        rows = []
+        for a in attempts_list:
+            t = tests.get(a.get("test_id"), {})
+            rows.append(
+                {
+                    "id": a.get("id"),
+                    "title": t.get("title") or a.get("title") or f"Test Attempt #{a.get('id')}",
+                    "score": float(a.get("score") or 0),
+                    "total_questions": a.get("total_questions"),
+                    "correct_answers": a.get("correct_answers"),
+                    "time_taken": a.get("time_taken"),
+                    "completed_at": _to_iso(a.get("completed_at")),
+                    "test_type": t.get("test_type") or a.get("test_type") or "test",
+                }
+            )
 
         return jsonify(rows), 200
+    except Exception as e:
+        return jsonify({"error": f"Database error: {e}"}), 500
+
+
+@tests_bp.route("/attempts/<int:attempt_id>", methods=["GET"])
+def attempt_detail(attempt_id):
+    try:
+        user_id = _jwt_user()
+    except Exception as e:
+        return jsonify({"error": "Unauthorized: " + str(e)}), 401
+
+    try:
+        db = get_db()
+        attempt_doc = db.collection("test_attempts").document(str(attempt_id)).get()
+        if not attempt_doc.exists:
+            return jsonify({"error": "Test attempt not found"}), 404
+
+        attempt = attempt_doc.to_dict() or {}
+        if attempt.get("user_id") != user_id:
+            return jsonify({"error": "Test attempt not found"}), 404
+
+        test = {}
+        test_id = attempt.get("test_id")
+        if test_id is not None:
+            test_doc = db.collection("tests").document(str(test_id)).get()
+            if test_doc.exists:
+                test = test_doc.to_dict() or {}
+
+        score = float(attempt.get("score") or 0)
+        detail = {
+            "id": attempt.get("id"),
+            "test_id": test_id,
+            "title": test.get("title") or attempt.get("title") or "Test Review",
+            "test_type": test.get("test_type") or attempt.get("test_type") or "test",
+            "score": score,
+            "grade": _get_grade(score),
+            "total_questions": attempt.get("total_questions") or 0,
+            "correct_answers": attempt.get("correct_answers") or 0,
+            "time_taken": attempt.get("time_taken") or 0,
+            "completed_at": _to_iso(attempt.get("completed_at")),
+            "feedback": attempt.get("feedback") or [],
+        }
+        return jsonify(detail), 200
     except Exception as e:
         return jsonify({"error": f"Database error: {e}"}), 500

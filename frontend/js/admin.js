@@ -83,6 +83,7 @@ function showAdminApp() {
   loadAdminMaterials();
   loadAdminTests();
   loadSubjectAnalytics();
+  loadReports();
   loadGoogleOAuthCheck();
 }
 
@@ -91,11 +92,13 @@ function adminTab(tab, btn) {
   document.querySelectorAll('.admin-nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById(`admin-tab-${tab}`).classList.add('active');
   btn.classList.add('active');
+  if (tab === 'reports') loadReports();
 }
 
 async function loadDashboard() {
   try {
     const stats = await api('/admin/stats');
+    const syncAt = formatTime(new Date());
     document.getElementById('dashboardStats').innerHTML = `
       <div class="admin-stat green">
         <div class="as-icon">U</div>
@@ -116,6 +119,11 @@ async function loadDashboard() {
         <div class="as-icon">S</div>
         <div class="as-value">${stats.platform_avg_score}%</div>
         <div class="as-label">Platform Avg Score</div>
+      </div>
+      <div class="admin-stat blue">
+        <div class="as-icon">IO</div>
+        <div class="as-value">LIVE</div>
+        <div class="as-label">System Sync - ${syncAt}</div>
       </div>`;
   } catch (e) {
     document.getElementById('dashboardStats').innerHTML = `<p style="color:var(--red);padding:20px">Error: ${e.message}</p>`;
@@ -407,6 +415,155 @@ async function loadGoogleOAuthCheck() {
   }
 }
 
+async function loadReports() {
+  try {
+    const range = getReportRangeQuery();
+    const [overview, insights] = await Promise.all([
+      api(`/admin/reports/overview${range}`),
+      api(`/admin/users/insights${range}`),
+    ]);
+
+    const totals = overview.totals || {};
+    const activity = overview.activity || {};
+
+    document.getElementById('reportsOverview').innerHTML = `
+      <div class="admin-stat green">
+        <div class="as-icon">U</div>
+        <div class="as-value">${totals.total_users || 0}</div>
+        <div class="as-label">Total Students</div>
+      </div>
+      <div class="admin-stat blue">
+        <div class="as-icon">A</div>
+        <div class="as-value">${activity.active_7d || 0}</div>
+        <div class="as-label">Active (7 days)</div>
+      </div>
+      <div class="admin-stat amber">
+        <div class="as-icon">M</div>
+        <div class="as-value">${totals.total_materials || 0}</div>
+        <div class="as-label">Materials</div>
+      </div>
+      <div class="admin-stat">
+        <div class="as-icon">T</div>
+        <div class="as-value">${totals.total_tests_taken || 0}</div>
+        <div class="as-label">Tests Taken</div>
+      </div>
+      <div class="admin-stat">
+        <div class="as-icon">C</div>
+        <div class="as-value">${totals.total_chat_sessions || 0}</div>
+        <div class="as-label">Chat Sessions</div>
+      </div>
+      <div class="admin-stat">
+        <div class="as-icon">P</div>
+        <div class="as-value">${activity.avg_materials_per_user || 0}</div>
+        <div class="as-label">Avg Materials/User</div>
+      </div>
+    `;
+
+    const topSubjectsBody = document.getElementById('reportsTopSubjects');
+    const topSubjects = overview.top_subjects || [];
+    topSubjectsBody.innerHTML = topSubjects.length
+      ? topSubjects.map(s => `<tr><td>${escHtml(s.subject)}</td><td>${s.materials || 0}</td><td>${s.users || 0}</td></tr>`).join('')
+      : `<tr><td colspan="3" style="text-align:center;padding:12px;color:var(--text-faint)">No subject data yet</td></tr>`;
+
+    const activityEl = document.getElementById('reportsActivity');
+    const uploads = overview.uploads_timeline || [];
+    const tests = overview.tests_timeline || [];
+    const newUsers = overview.new_users_timeline || [];
+    activityEl.innerHTML = `
+      <div class="report-list">
+        <div>
+          <h5>Uploads</h5>
+          ${uploads.length ? uploads.map(r => `<div>${r.day}: ${r.count}</div>`).join('') : '<div class="muted">No uploads</div>'}
+        </div>
+        <div>
+          <h5>Tests</h5>
+          ${tests.length ? tests.map(r => `<div>${r.day}: ${r.count} (avg ${parseFloat(r.avg_score || 0).toFixed(1)}%)</div>`).join('') : '<div class="muted">No tests</div>'}
+        </div>
+        <div>
+          <h5>New Users</h5>
+          ${newUsers.length ? newUsers.map(r => `<div>${r.day}: ${r.count}</div>`).join('') : '<div class="muted">No signups</div>'}
+        </div>
+      </div>
+    `;
+
+    const insightsEl = document.getElementById('reportsInsights');
+    insightsEl.innerHTML = `
+      <div class="report-split">
+        ${renderInsightTable('Top Materials', insights.top_materials || [])}
+        ${renderInsightTable('Top Tests', insights.top_tests || [])}
+        ${renderInsightTable('Top Scores', insights.top_scores || [])}
+      </div>
+    `;
+
+    const inactiveEl = document.getElementById('reportsInactive');
+    inactiveEl.innerHTML = `
+      <div class="report-split">
+        ${renderInsightTable('Inactive 7d', insights.inactive_7d || [])}
+        ${renderInsightTable('Inactive 30d', insights.inactive_30d || [])}
+      </div>
+    `;
+  } catch (e) {
+    document.getElementById('reportsOverview').innerHTML = `<p style="color:var(--red);padding:20px">Error: ${escHtml(e.message)}</p>`;
+  }
+}
+
+function renderInsightTable(title, rows) {
+  const body = rows.length
+    ? rows.map(r => `<tr><td>${escHtml(r.name || '-')}</td><td>${r.materials || 0}</td><td>${r.tests || 0}</td><td>${parseFloat(r.avg_score || 0).toFixed(1)}%</td></tr>`).join('')
+    : `<tr><td colspan="4" style="text-align:center;padding:8px;color:var(--text-faint)">No data</td></tr>`;
+
+  return `
+    <div>
+      <h5>${escHtml(title)}</h5>
+      <table class="admin-table compact">
+        <thead><tr><th>User</th><th>Mat</th><th>Tests</th><th>Avg</th></tr></thead>
+        <tbody>${body}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+async function exportData(kind) {
+  try {
+    const range = getReportRangeQuery();
+    const ids = (document.getElementById('exportUserIds')?.value || '').trim();
+    const userIds = ids ? `&user_ids=${encodeURIComponent(ids)}` : '';
+    const blob = await apiBlob(`/admin/export/${kind}${range}${userIds}`);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `studybot_${kind}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    alert(`Export failed: ${e.message}`);
+  }
+}
+
+function getReportRangeQuery() {
+  const start = document.getElementById('reportStart')?.value || '';
+  const end = document.getElementById('reportEnd')?.value || '';
+  const params = new URLSearchParams();
+  if (start) params.set('start_date', start);
+  if (end) params.set('end_date', end);
+  const qs = params.toString();
+  return qs ? `?${qs}` : '';
+}
+
+function applyReportFilter() {
+  loadReports();
+}
+
+function clearReportFilter() {
+  const s = document.getElementById('reportStart');
+  const e = document.getElementById('reportEnd');
+  if (s) s.value = '';
+  if (e) e.value = '';
+  loadReports();
+}
+
 async function viewUserProfile(id) {
   try {
     const data = await api(`/admin/users/${id}/profile`);
@@ -465,6 +622,11 @@ function formatDate(dt) {
   return new Date(dt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
+function formatTime(dt) {
+  if (!dt) return '-';
+  return new Date(dt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+}
+
 function formatSize(bytes) {
   if (!bytes) return '-';
   if (bytes < 1024) return `${bytes} B`;
@@ -510,5 +672,54 @@ async function resetUserPassword(id) {
     alert('Password reset successful.');
   } catch (e) {
     alert(`Error: ${e.message}`);
+  }
+}
+
+function openResetModal() {
+  document.getElementById('resetEmail').value = '';
+  document.getElementById('resetToken').value = '';
+  document.getElementById('resetPassword').value = '';
+  document.getElementById('resetTokenHint').textContent = '';
+  document.getElementById('resetError').classList.add('hidden');
+  document.getElementById('resetModal').classList.remove('hidden');
+}
+
+async function requestResetCode() {
+  const email = document.getElementById('resetEmail').value.trim();
+  const errEl = document.getElementById('resetError');
+  errEl.classList.add('hidden');
+  try {
+    const res = await fetch(`${API}/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    }).then(r => r.json());
+    if (res.error) throw new Error(res.error);
+    const hint = document.getElementById('resetTokenHint');
+    hint.textContent = res.message || 'If the email exists, an OTP was sent.';
+  } catch (e) {
+    errEl.textContent = e.message;
+    errEl.classList.remove('hidden');
+  }
+}
+
+async function resetPassword() {
+  const email = document.getElementById('resetEmail').value.trim();
+  const token = document.getElementById('resetToken').value.trim();
+  const newPassword = document.getElementById('resetPassword').value;
+  const errEl = document.getElementById('resetError');
+  errEl.classList.add('hidden');
+  try {
+    const res = await fetch(`${API}/auth/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, token, new_password: newPassword })
+    }).then(r => r.json());
+    if (res.error) throw new Error(res.error);
+    closeModal('resetModal');
+    alert('Password reset successful. Please sign in.');
+  } catch (e) {
+    errEl.textContent = e.message;
+    errEl.classList.remove('hidden');
   }
 }
