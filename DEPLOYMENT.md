@@ -25,6 +25,35 @@
 - Keep all AI keys, Firebase admin credentials, SMTP credentials, and JWT secrets only in host environment variables.
 - Use `/api` on the same origin so the browser never needs your server secrets.
 
+## Alternative Deploy Shape: Vercel Frontend + Railway Backend
+
+Use this when you want the static site on Vercel and the Flask API on Railway.
+
+1. Deploy the backend on Railway from the repo root `/`.
+2. Add all backend secrets in Railway Variables.
+3. Create a Railway volume mounted at `/app/backend/uploads`.
+4. Generate a Railway public domain and test `/api/health`.
+5. In `frontend/config.js`, set `window.STUDYBOT_API_BASE` to your Railway backend URL plus `/api`.
+6. Deploy the `frontend/` directory to Vercel as a static site.
+7. Add your Vercel frontend origin to Railway `CORS_ALLOWED_ORIGINS`.
+8. Add the same Vercel frontend origin to `GOOGLE_ALLOWED_ORIGINS`.
+9. Add `https://your-vercel-domain/auth/google/callback` to `GOOGLE_ALLOWED_REDIRECTS`.
+10. Add the same Google OAuth values in Google Cloud Console.
+
+Example `frontend/config.js`:
+
+```js
+window.STUDYBOT_API_BASE = "https://your-backend.up.railway.app/api";
+```
+
+Example backend env values for split domains:
+
+```env
+CORS_ALLOWED_ORIGINS=https://your-frontend.vercel.app
+GOOGLE_ALLOWED_ORIGINS=https://your-frontend.vercel.app
+GOOGLE_ALLOWED_REDIRECTS=https://your-frontend.vercel.app/auth/google/callback
+```
+
 ## Before You Push Publicly
 
 1. Rotate any secrets that were ever committed or stored in tracked files.
