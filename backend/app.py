@@ -27,9 +27,44 @@ app.config["JWT_HEADER_TYPE"] = "Bearer"
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(days=config.JWT_EXPIRY_DAYS)
 app.config["MAX_CONTENT_LENGTH"] = config.MAX_UPLOAD_MB * 1024 * 1024
 
-cors_origins = config.CORS_ALLOWED_ORIGINS or config.GOOGLE_ALLOWED_ORIGINS
-if cors_origins:
-    CORS(app, resources={r"/api/*": {"origins": cors_origins}})
+# Build CORS origins list
+cors_origins = config.CORS_ALLOWED_ORIGINS.copy() if config.CORS_ALLOWED_ORIGINS else []
+
+# Add development origins
+if config.DEBUG:
+    cors_origins.extend([
+        "http://localhost:3000",
+        "http://localhost:5000",
+        "http://localhost:5173",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5000",
+        "http://127.0.0.1:5173",
+    ])
+
+# Add production origins
+cors_origins.extend([
+    "https://study-bot-new.vercel.app",
+    "https://studybot-production-f344.up.railway.app",
+    "https://*.vercel.app",
+])
+
+# Add Google allowed origins if configured
+if config.GOOGLE_ALLOWED_ORIGINS:
+    cors_origins.extend(config.GOOGLE_ALLOWED_ORIGINS)
+
+# Remove duplicates while preserving order
+cors_origins = list(dict.fromkeys(cors_origins))
+
+# Configure CORS
+CORS(app, 
+     resources={r"/api/*": {
+         "origins": cors_origins,
+         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+         "allow_headers": ["Content-Type", "Authorization"],
+         "expose_headers": ["Content-Type", "Authorization"],
+         "supports_credentials": True,
+         "max_age": 3600
+     }})
 
 jwt = JWTManager(app)
 
