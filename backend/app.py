@@ -3,7 +3,7 @@ import sys
 from datetime import timedelta
 
 import bcrypt
-from flask import Flask, jsonify, send_from_directory, request
+from flask import Flask, jsonify, send_from_directory
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 
@@ -62,18 +62,6 @@ CORS(app,
          "supports_credentials": True,
          "max_age": 3600
      }})
-
-# Add after-request handler to ensure CORS headers are always set
-@app.after_request
-def after_request(response):
-    origin = request.headers.get("Origin")
-    if origin in cors_origins:
-        response.headers.add("Access-Control-Allow-Origin", origin)
-        response.headers.add("Access-Control-Allow-Credentials", "true")
-        response.headers.add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
-        response.headers.add("Access-Control-Allow-Headers", "Content-Type, Authorization")
-        response.headers.add("Access-Control-Expose-Headers", "Content-Type, Authorization")
-    return response
 
 jwt = JWTManager(app)
 
