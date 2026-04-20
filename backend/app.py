@@ -27,26 +27,24 @@ app.config["JWT_HEADER_TYPE"] = "Bearer"
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(days=config.JWT_EXPIRY_DAYS)
 app.config["MAX_CONTENT_LENGTH"] = config.MAX_UPLOAD_MB * 1024 * 1024
 
-# Build CORS origins list
-cors_origins = config.CORS_ALLOWED_ORIGINS.copy() if config.CORS_ALLOWED_ORIGINS else []
-
-# Add development origins
-if config.DEBUG:
-    cors_origins.extend([
-        "http://localhost:3000",
-        "http://localhost:5000",
-        "http://localhost:5173",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:5000",
-        "http://127.0.0.1:5173",
-    ])
-
-# Add production origins
-cors_origins.extend([
+# Build CORS origins list - always include production domains
+cors_origins = [
+    # Development
+    "http://localhost:3000",
+    "http://localhost:5000",
+    "http://localhost:5173",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:5000",
+    "http://127.0.0.1:5173",
+    # Production (always included)
     "https://study-bot-new.vercel.app",
     "https://studybot-production-f344.up.railway.app",
     "https://*.vercel.app",
-])
+]
+
+# Add environment variable origins if specified
+if config.CORS_ALLOWED_ORIGINS:
+    cors_origins.extend(config.CORS_ALLOWED_ORIGINS)
 
 # Add Google allowed origins if configured
 if config.GOOGLE_ALLOWED_ORIGINS:
