@@ -3,7 +3,7 @@ import sys
 from datetime import timedelta
 
 import bcrypt
-from flask import Flask, jsonify, send_from_directory
+from flask import Flask, jsonify, send_from_directory, request
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 
@@ -27,19 +27,18 @@ app.config["JWT_HEADER_TYPE"] = "Bearer"
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(days=config.JWT_EXPIRY_DAYS)
 app.config["MAX_CONTENT_LENGTH"] = config.MAX_UPLOAD_MB * 1024 * 1024
 
-# Build CORS origins list - always include production domains
+# Build CORS origins list
 cors_origins = [
-    # Development
+    # Production domains (must use HTTPS!)
+    "https://study-bot-new.vercel.app",
+    "https://studybot-production-f344.up.railway.app",
+    # Development domains
     "http://localhost:3000",
     "http://localhost:5000",
     "http://localhost:5173",
     "http://127.0.0.1:3000",
     "http://127.0.0.1:5000",
     "http://127.0.0.1:5173",
-    # Production (always included)
-    "https://study-bot-new.vercel.app",
-    "https://studybot-production-f344.up.railway.app",
-    "https://*.vercel.app",
 ]
 
 # Add environment variable origins if specified
@@ -53,7 +52,7 @@ if config.GOOGLE_ALLOWED_ORIGINS:
 # Remove duplicates while preserving order
 cors_origins = list(dict.fromkeys(cors_origins))
 
-# Configure CORS
+# Configure CORS with explicit origins (no wildcards)
 CORS(app, 
      resources={r"/api/*": {
          "origins": cors_origins,
@@ -63,6 +62,18 @@ CORS(app,
          "supports_credentials": True,
          "max_age": 3600
      }})
+
+# Add after-request handler to ensure CORS headers are always set
+@app.after_request
+def after_request(response):
+    origin = request.headers.get("Origin")
+    if origin in cors_origins:
+        response.headers.add("Access-Control-Allow-Origin", origin)
+        response.headers.add("Access-Control-Allow-Credentials", "true")
+        response.headers.add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        response.headers.add("Access-Control-Expose-Headers", "Content-Type, Authorization")
+    return response
 
 jwt = JWTManager(app)
 
